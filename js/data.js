@@ -88,5 +88,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'bash',
     description: 'GNU Screen 配置 — autodetach、UTF-8、scrollback、keybind、SSH 快速啟動視窗'
+  },
+  {
+    id: 11,
+    title: '.bash_aliases',
+    category: 'Scripts',
+    tags: ['bash', 'alias', 'git', 'ssh', 'shell', 'config'],
+    date: '2026-04-28',
+    lang: 'bash',
+    description: 'Shell alias 設定 — git 操作、Gerrit push、SSH 快速連線、常用工具'
   }
 ];

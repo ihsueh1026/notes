@@ -1121,6 +1121,95 @@ screen -t "[dbw5][8.83]"      7  bash -c 'sshpass -p 12345678  ssh rdadmin@10.11
 screen -t "[ddw1][8.26]"      8  bash -c 'sshpass -p 12345678  ssh rdadmin@10.113.8.26'
 </script>
 
+<script type="text/plain" id="nc-11">
+# ── Git ──────────────────────────────────────────────────────────
+alias gl="git log"
+alias gll="git log --color --date=short --pretty=format:'%C(yellow)%h%Creset  %Cgreen[%<(15,trunc)%an] %Creset %s (%cd)'"
+alias glll="git log --oneline"
+alias gs="git status"
+alias gd="git diff"
+alias ga="git add"
+alias gc="git checkout"
+alias gb="git branch"
+alias gbb="git branch -av"
+alias gcp="git cherry-pick"
+alias gp="git pull"
+alias gf="git format-patch"
+alias gv="git remote -v"
+alias gr="git reset --hard"
+alias grh="git reset --hard HEAD^"
+alias gst="git stash"
+
+# ── Gerrit push ───────────────────────────────────────────────────
+alias pushg="git push origin HEAD:refs/for/pi-wear-hmr1-dev"
+alias pushhmr2="git push origin HEAD:refs/for/pi-wear-hmr2-dev"
+
+# ── Git config switch ─────────────────────────────────────────────
+alias cg="cp ~/.gitconfig-google ~/.gitconfig"
+alias cf="cp ~/.gitconfig-fossil ~/.gitconfig"
+
+# ── Navigation ────────────────────────────────────────────────────
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias q2100="cd ~/qualcomm/2100"
+alias q3100="cd ~/qualcomm/3100"
+alias g2100="cd ~/google/2100"
+alias g3100="cd ~/google/3100"
+alias c2100="cd ~/compal/2100"
+alias c3100="cd ~/compal/3100"
+
+# ── SSH — no password ────────────────────────────────────────────
+alias sshdlw1="ssh rdadmin@10.113.8.74"
+alias sshdbw2="ssh rdadmin@10.113.8.50"
+alias sshdlw2="ssh rdadmin@10.113.8.51"
+alias sshesw1="ssh rdadmin@10.113.8.64"
+alias sshetfa="ssh rdadmin@10.113.8.29"
+alias sshgit="ssh ali_lin@10.113.8.171"
+
+# ── SSH — password: efwaefwa ─────────────────────────────────────
+alias sshdaw5="sshpass -p efwaefwa ssh rdadmin@10.113.8.23"
+alias ssheet1="sshpass -p efwaefwa ssh rdadmin@10.113.8.25"
+alias sshzxw3="sshpass -p efwaefwa ssh rdadmin@10.113.8.26"
+alias sshefwa="sshpass -p efwaefwa ssh rdadmin@10.113.8.90"
+
+# ── SSH — password: 12345678 ─────────────────────────────────────
+alias sshddw1="sshpass -p 12345678 ssh rdadmin@10.113.8.26"
+alias sshdhw2="sshpass -p 12345678 ssh rdadmin@10.113.8.36"
+alias sshdlw5="sshpass -p 12345678 ssh rdadmin@10.113.8.37"
+alias ssheft1="sshpass -p 12345678 ssh rdadmin@10.113.8.71"
+alias ssheet2="sshpass -p 12345678 ssh rdadmin@10.113.8.72"
+alias sshamd1="sshpass -p 12345678 ssh rdadmin@10.113.8.56"
+alias sshzxw8="sshpass -p 12345678 ssh rdadmin@10.113.8.61"
+alias sshfft1="sshpass -p 12345678 ssh rdadmin@10.113.8.91"
+alias sshefc1="sshpass -p 12345678 ssh rdadmin@10.113.8.80"
+alias sshdbw5="sshpass -p 12345678 ssh rdadmin@10.113.8.83"
+alias sshdbw3="sshpass -p 12345678 ssh rdadmin@10.113.8.74"
+alias ssheftm="sshpass -p 12345678 ssh rdadmin@10.113.8.30"
+alias sshesw2="sshpass -p 12345678 ssh rdadmin@10.113.8.98"
+alias sshefca="sshpass -p 12345678 ssh rdadmin@10.113.8.99"
+alias sshdlw3="sshpass -p 12345678 ssh rdadmin@10.113.168.102"
+alias sshjenkins="sshpass -p 12345678 ssh rdadmin@10.113.8.92"
+alias sshsky="sshpass -p 12345678 ssh supersky@10.113.60.134"
+alias ssha32="sshpass -p 12345678 ssh a32@10.113.61.229"
+alias sshgitdjw3="sshpass -p 12345678 ssh ali_lin@10.113.8.182"
+
+# ── SSH — password: Aa123456 ─────────────────────────────────────
+alias ssh5100="sshpass -p Aa123456 ssh rdadmin@10.113.8.39"
+alias sshgit20="sshpass -p Aa123456 ssh rdadmin@10.113.8.172"
+
+# ── SSH — other ───────────────────────────────────────────────────
+alias sshmtk="sshpass -p Aa112233 ssh william@10.113.61.201"
+
+# ── Tools ─────────────────────────────────────────────────────────
+alias hi='history | grep'
+alias findmk="find . -name '*mk'"
+alias vmlinux="strings ~/share/prebuilt_kernel/vmlinux | grep -i 'Linux version'"
+alias checkpatch="~/script/checkpatch.pl --ignore GERRIT_CHANGE_ID -g"
+alias prebuilt="sh ~/script/prebuilt.sh"
+alias aliases="cat ~/.bash_aliases"
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
