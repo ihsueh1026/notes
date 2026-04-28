@@ -115,5 +115,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'markdown',
     description: 'QmuxMdm Windows KMDF 驅動套件架構 — qcqmux/qcqmuxusb/qcqmuxpcie 三驅動、IOCTL 介面、RMNET 通道、INF 安裝邏輯'
+  },
+  {
+    id: 14,
+    title: 'atfwd-daemon 架構',
+    category: 'Docs',
+    tags: ['atfwd', 'at-command', 'qmi', 'atcop', 'android', 'daemon', 'qualcomm', 'lwm2m', 'supl'],
+    date: '2026-04-28',
+    lang: 'markdown',
+    description: 'AT Forwarding Daemon 架構 — QMI ATCOP 註冊、AT 命令分發、UNIX socket 客戶端通訊、82 條命令清單'
   }
 ];

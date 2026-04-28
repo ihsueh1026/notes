@@ -1504,6 +1504,139 @@ qmi_connection_id_type 定義多條虛擬 QMI 通道：
 | Gobi | 舊式 Gobi 驅動客戶端（legacy，需 ALLOC_CLIENT_ID 等額外 IOCTL）|
 </script>
 
+<script type="text/plain" id="nc-14">
+# atfwd-daemon 架構
+
+## 概述
+
+Android Linux 使用者空間常駐程式，向 QMI ATCOP 服務註冊，
+攔截來自數據機的 AT 命令並在本地處理或轉發給外部客戶端。
+
+## 整體架構
+
+```
+Modem（QMI ATCOP Service）
+      │  QMI indication（AT 命令）
+      ▼
+┌─────────────────────────────────────────┐
+│            atfwd-daemon                  │
+│                                         │
+│  QMI 層          →  ds_cmdq            │
+│  (indication cb)     (事件佇列)          │
+│                       │                 │
+│               atfwd_cb_cmd_exec()       │
+│                       │                 │
+│           atfwd_process_new_request()   │
+│                       │                 │
+│      ┌────────────────┼──────────────┐  │
+│      ▼                ▼              ▼  │
+│  inline handler  CmdHandle_lookup  forward│
+│  (+CFUN,*B*等)  (handler table)  to client│
+└───────────────────────────────────────┬─┘
+                                        │ UNIX domain socket / NetLink
+                                        ▼
+                              外部 AT 客戶端（最多 20 個）
+```
+
+## 模組說明
+
+| 檔案 | 功能 |
+|------|------|
+| atfwd_daemon.c        | 主程式：QMI 初始化、AT 命令註冊、事件調度 |
+| atfwd_cmdhandle.c     | 函式指標 handler table；CmdHandle_lookup() 路由 |
+| atfwd_customcmd_handle.c | 簡單 set/get 型命令，NV 存取模式 |
+| atfwd_unix.c          | UNIX domain socket + NetLink socket 通訊層 |
+| atfwd_mtdop.c         | MTD/NAND flash 讀寫（韌體更新、image 操作）|
+| impref_pri.c          | IM 偏好（*BIMPREF）優先級管理 |
+| supl_event.c          | SUPL 定位事件（suplstart / suplreply / suplend）|
+
+## main() 啟動流程
+
+```
+main()
+  ├── Diag_LSM_Init()                      # 診斷日誌
+  ├── atfwd_signal_init()                  # SIGINT/SIGTERM
+  ├── atfwd_cmdq_init()                    # ds_cmdq 事件佇列
+  ├── atfwd_dll_init()                     # pending indication 鏈結串列
+  ├── at_get_service_object_v01()          # QMI AT service object
+  ├── atfwd_reg_for_service_up_event()     # 等待 modem UP
+  ├── atfwd_unix_netlink_init()            # NetLink 事件 socket
+  ├── hwidTorfs()                          # HWID 寫入 RFS
+  ├── lwm2mDebugStart(true)               # LwM2M debug 執行緒
+  └── atfwd_unix_listener_init()           # UNIX socket 監聽（主迴圈）
+```
+
+## 事件處理流程
+
+### QMI Modem UP
+```
+atfwd_sys_up_cb()
+  → cmdq enqueue(ATFWD_UP_EV)
+  → atfwd_qmi_client_init()              # qmi_client_init_instance
+  → atfwd_register_legacy_at_commands()  # 向 ATCOP 註冊 82 條命令
+  → atfwd_unix_send_event(DS_AT_UP_EV)   # 通知所有客戶端
+```
+
+### AT 命令收到
+```
+qmi_at_unsol_ind_cb()
+  → cmdq enqueue(ATFWD_CMD_IND_EV)
+  → atfwd_process_new_request()
+      ├── 1. inline handler（+CFUN, *BPHASEID 等硬編碼）
+      ├── 2. CmdHandle_lookup(name) → atcmd_handler()
+      ├── 3. custom_CmdHandle_lookup(name) → Custom_AtCmdHandle()
+      └── 4. 無 handler → 轉發給外部 client（dll + UNIX msg）
+```
+
+## AT 命令分發優先順序
+
+```
+1. inline if/else（atfwd_process_new_request 內硬編碼，legacy + *B* 系列）
+2. CmdHandle_lookup()        → atfwd_cmdhandle.c handler table
+3. custom_CmdHandle_lookup() → atfwd_customcmd_handle.c set/get table
+4. 轉發給 UNIX 客戶端（pending dll + netlink 通知）
+```
+
+## 主要 AT 命令分類（共 82 條）
+
+| 前綴 | 範例 | 說明 |
+|------|------|------|
+| 標準 | +CFUN, $QCPWRDN         | 功能/電源 |
+| *U*  | *UCOMP, *USPEED, *UPID  | USB 組態 |
+| *B*  | *BRESET, *BBOOTHOLD, *BFWVER, *BIMAGE, *BIMPREF | Boot/韌體 |
+| *PC* | *PCTEMP, *PCVOLT        | 電源/溫度監控 |
+| *GPS*| *GPSELNA, *GPSCONF      | GPS 設定 |
+| AT!  | AT!FLOG, AT!ERR, AT!CHKSB | 診斷/debug |
+| LwM2M| *LWM2M, *LWM2MURL      | LwM2M IoT 管理 |
+| SAR  | *SARDEFAULTSTATE, *SARINDEX | SAR 設定 |
+| SUPL | *SUPLSTART, *SUPLREPLY  | SUPL 定位 |
+
+## customcmd_handle 模式
+
+適用於 NV 讀寫型命令，統一 set/get pattern：
+
+```c
+typedef struct {
+    char atcmd[65];
+    atcmd_set_handler  set_fcn;   // AT cmd=<value>
+    atcmd_get_handler  get_fcn;   // AT cmd?
+    char valid_values[5];         // 合法值範圍
+} atfwd_customcmd_handler;
+```
+
+命令：WakeUpHostEN、SingleApnSwitch、FastEnum、USBSerialEn、
+      GPSSel/Enable/LPM、ProviderNameFmt、MbimType、GpioTunerEnable
+
+## 通訊介面
+
+| 介面 | 用途 |
+|------|------|
+| QMI ATCOP（qmi_client）| 從數據機收 AT 命令；回傳 response |
+| QMI DMS               | 取得裝置資訊（序號等）|
+| NetLink socket        | 向客戶端推送 UP/DOWN/CMD 非同步事件 |
+| UNIX domain socket    | 雙向：接收客戶端 AT 請求 + 回傳 response |
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
