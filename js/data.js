@@ -79,5 +79,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'links',
     description: '內網 Julius Docs — QCOM / Yocto / MTK / Download 各章節連結'
+  },
+  {
+    id: 10,
+    title: '.screenrc',
+    category: 'Scripts',
+    tags: ['screen', 'terminal', 'ssh', 'multiplexer', 'config'],
+    date: '2026-04-28',
+    lang: 'bash',
+    description: 'GNU Screen 配置 — autodetach、UTF-8、scrollback、keybind、SSH 快速啟動視窗'
   }
 ];

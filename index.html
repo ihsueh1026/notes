@@ -1078,6 +1078,53 @@ http://10.113.51.153/public_docs/Yocto/Yocto_Partition%20Development/
 http://10.113.51.153/public_docs/Yocto/Yocto_Poky_BuildEnv/
 </script>
 
+<script type="text/plain" id="nc-10">
+# ── Global ───────────────────────────────────────────────────────
+startup_message off
+vbell          off
+autodetach     on          # detach on hangup instead of killing session
+defutf8        on
+defscrollback  10000
+altscreen      on          # restore screen content after vim/less exits
+shell          -$SHELL     # login shell so aliases/.bashrc load
+
+# ── Terminal ─────────────────────────────────────────────────────
+termcapinfo xterm "Co#256:AB=\E[48;5;%dm:AF=\E[38;5;%dm"
+
+# ── Status bar ───────────────────────────────────────────────────
+hardstatus on
+hardstatus alwayslastline
+hardstatus string "%{=b kb}%-w%{=b ky}[ %n ]%{=b kb}%+w%=%{km}%C %A"
+
+# ── Key bindings ─────────────────────────────────────────────────
+bindkey -k k1  prev
+bindkey -k k2  next
+bindkey "^[`"  select 0
+bindkey "^[1"  select 1
+bindkey "^[2"  select 2
+bindkey "^[3"  select 3
+bindkey "^[4"  select 4
+bindkey "^[5"  select 5
+bindkey "^[6"  select 6
+bindkey "^[7"  select 7
+bindkey "^[8"  select 8
+bindkey "^[9"  select 9
+bindkey "^[0"  select 10
+bindkey "^[-"  select 11
+bindkey "^[="  select 12
+
+# ── Startup windows ──────────────────────────────────────────────
+screen -t "[local-0]"         0
+screen -t "[local-1]"         1
+screen -t "[local-2]"         2
+screen -t "[slate]"           3  bash -c 'sshpass -p Aa123456  ssh rdadmin@10.113.8.39'
+screen -t "[git]"             4  bash -c 'sshpass -p Aa123456  ssh rdadmin@10.113.8.172'
+screen -t "[supersky]"        5  bash -c 'sshpass -p 12345678  ssh supersky@10.113.60.159'
+screen -t "[amd1][8.56]"      6  bash -c 'sshpass -p 12345678  ssh rdadmin@10.113.8.56'
+screen -t "[dbw5][8.83]"      7  bash -c 'sshpass -p 12345678  ssh rdadmin@10.113.8.83'
+screen -t "[ddw1][8.26]"      8  bash -c 'sshpass -p 12345678  ssh rdadmin@10.113.8.26'
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
