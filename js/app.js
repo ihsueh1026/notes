@@ -93,6 +93,19 @@ var App = (function () {
       });
     });
 
+    /* Reset button (view mode, only when modified) */
+    var resetViewBtn = document.getElementById('resetBtn');
+    if (resetViewBtn) {
+      resetViewBtn.addEventListener('click', function () {
+        if (!confirm('確定要還原成原始內容嗎？目前的修改將全部捨棄。')) return;
+        NoteStorage.reset(note.id);
+        openNote(note);
+      });
+    }
+
+    /* Push to GitHub */
+    document.getElementById('pushBtn').addEventListener('click', pushToGitHub);
+
     /* Edit button */
     document.getElementById('editBtn').addEventListener('click', function () {
       editNote(note);
@@ -197,6 +210,80 @@ var App = (function () {
       reader.readAsText(input.files[0]);
     });
     input.click();
+  }
+
+  /* ── Push to GitHub ── */
+  function pushToGitHub() {
+    var TOKEN_KEY = 'ali_github_token';
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      token = prompt('請輸入 GitHub Personal Access Token：');
+      if (!token) return;
+      localStorage.setItem(TOKEN_KEY, token.trim());
+      token = token.trim();
+    }
+
+    var modified = NoteStorage.getModifiedIds();
+    if (!modified.length) { alert('沒有已修改的筆記'); return; }
+
+    var btn = document.getElementById('pushBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '推送中…'; }
+
+    var api = 'https://api.github.com/repos/ihsueh1026/notes/contents/index.html';
+    var headers = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' };
+
+    fetch(api, { headers: headers })
+      .then(function (r) { return r.json(); })
+      .then(function (file) {
+        var sha = file.sha;
+        /* Decode base64 → UTF-8 string */
+        var raw = atob(file.content.replace(/\n/g, ''));
+        var bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        var html = new TextDecoder('utf-8').decode(bytes);
+
+        /* Replace each modified nc-{id} block */
+        modified.forEach(function (id) {
+          var saved = NoteStorage.load(id);
+          if (saved === null) return;
+          html = html.replace(
+            new RegExp('(<script type="text\\/plain" id="nc-' + id + '">)[\\s\\S]*?(<\\/script>)'),
+            function (_, open, close) { return open + '\n' + saved + '\n' + close; }
+          );
+        });
+
+        /* Encode UTF-8 string → base64 */
+        var encoded = new TextEncoder().encode(html);
+        var bin = '';
+        encoded.forEach(function (b) { bin += String.fromCharCode(b); });
+
+        return fetch(api, {
+          method: 'PUT',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+          body: JSON.stringify({
+            message: 'Update ' + modified.length + ' note(s) via browser',
+            content: btoa(bin),
+            sha: sha
+          })
+        });
+      })
+      .then(function (r) {
+        if (r.ok) {
+          modified.forEach(function (id) { NoteStorage.reset(id); });
+          alert('推送成功！' + modified.length + ' 個筆記已更新');
+          if (state.active) openNote(state.active);
+          else renderSidebar();
+        } else {
+          return r.json().then(function (e) { throw new Error(e.message || r.status); });
+        }
+      })
+      .catch(function (e) {
+        alert('推送失敗：' + e.message);
+        if (e.message === 'Bad credentials') localStorage.removeItem(TOKEN_KEY);
+      })
+      .finally(function () {
+        if (btn) { btn.disabled = false; btn.innerHTML = ''; btn.textContent = 'Push'; }
+      });
   }
 
   /* ── Init ── */

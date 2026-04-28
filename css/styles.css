@@ -226,6 +226,9 @@ body {
 .btn.primary:hover { opacity: .85; }
 .btn.danger { color: var(--red); }
 .btn.danger:hover { background: rgba(248,81,73,.1); border-color: var(--red); }
+.btn.success { color: var(--green); }
+.btn.success:hover { background: rgba(63,185,80,.1); border-color: var(--green); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Tags & Badges ── */
 .tag {
