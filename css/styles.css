@@ -107,36 +107,39 @@ body {
 #search:focus { border-color: var(--accent); }
 #search::placeholder { color: var(--muted); }
 
-.section-label {
-  font-size: .7rem;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 14px 16px 6px;
+/* ── Accordion sidebar ── */
+.acc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
+.acc-list::-webkit-scrollbar { width: 4px; }
+.acc-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-.cat-list { padding: 0 8px; }
-.cat-item {
-  display: flex; align-items: center; justify-content: space-between;
+.acc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: .875rem;
+  font-size: .8rem;
+  font-weight: 600;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
   transition: background .15s, color .15s;
+  user-select: none;
 }
-.cat-item:hover { background: var(--surface); color: var(--text); }
-.cat-item.active { background: var(--accent-bg); color: var(--accent); }
-.cat-item .badge {
+.acc-header:hover { background: var(--surface); color: var(--text); }
+.acc-arrow { font-size: .65rem; width: 10px; flex-shrink: 0; }
+.acc-label { flex: 1; }
+.acc-header .badge {
   font-size: .7rem; background: var(--surface);
   border-radius: 10px; padding: 1px 7px; color: var(--muted);
 }
-.cat-item.active .badge { background: var(--accent-bg); color: var(--accent); }
 
-.notes-list { flex: 1; overflow-y: auto; padding: 8px; }
-.notes-list::-webkit-scrollbar { width: 4px; }
-.notes-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.acc-notes { padding: 2px 0 4px 10px; }
 
 .note-item {
   padding: 10px 12px;

@@ -67,6 +67,54 @@ var UI = (function () {
     }).join('');
   }
 
+  /* ── Accordion sidebar ── */
+  function renderAccordion(notes, expandedCats, activeId, modifiedIds, query) {
+    var q = (query || '').toLowerCase();
+
+    /* Build ordered category → notes map */
+    var cats = [];
+    var catMap = {};
+    notes.forEach(function (n) {
+      if (!catMap[n.category]) { catMap[n.category] = []; cats.push(n.category); }
+      catMap[n.category].push(n);
+    });
+
+    return cats.map(function (cat) {
+      var all = catMap[cat];
+      var visible = q ? all.filter(function (n) {
+        return n.title.toLowerCase().indexOf(q) >= 0
+          || n.tags.some(function (t) { return t.toLowerCase().indexOf(q) >= 0; })
+          || (n.description || '').toLowerCase().indexOf(q) >= 0;
+      }) : all;
+
+      if (q && !visible.length) return '';
+
+      var expanded = q || expandedCats.indexOf(cat) >= 0;
+      var arrow = expanded ? '▾' : '▸';
+
+      var notesHtml = visible.map(function (n) {
+        var cls = 'note-item' + (n.id === activeId ? ' active' : '');
+        var dot = modifiedIds.indexOf(n.id) >= 0
+          ? '<span class="modified-dot" title="已修改"></span>' : '';
+        return '<div class="' + cls + '" data-id="' + n.id + '">'
+          + '<div class="note-item-title"><span>' + esc(n.title) + '</span>' + dot + '</div>'
+          + '<div class="note-item-meta">'
+          + '<span class="lang-badge">' + esc(n.lang) + '</span>'
+          + '<span>' + esc(n.date) + '</span>'
+          + '</div></div>';
+      }).join('');
+
+      return '<div class="acc-cat" data-cat="' + esc(cat) + '">'
+        + '<div class="acc-header">'
+        + '<span class="acc-arrow">' + arrow + '</span>'
+        + '<span class="acc-label">' + esc(cat) + '</span>'
+        + '<span class="badge">' + visible.length + '</span>'
+        + '</div>'
+        + (expanded ? '<div class="acc-notes">' + notesHtml + '</div>' : '')
+        + '</div>';
+    }).join('');
+  }
+
   /* ── Links renderer (lang === 'links') ── */
   function renderLinksContent(content) {
     var lines = content.split('\n');
@@ -192,8 +240,7 @@ var UI = (function () {
 
   /* Public API */
   return {
-    renderCategories: renderCategories,
-    renderList:       renderList,
+    renderAccordion:  renderAccordion,
     renderNoteView:   renderNoteView,
     renderEditorView: renderEditorView,
     renderEmpty:      renderEmpty

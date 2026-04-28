@@ -7,10 +7,10 @@ var App = (function () {
   /* ── State ── */
   var state = {
     notes: typeof NOTES_META !== 'undefined' ? NOTES_META : [],
-    active: null,   // currently open note object
-    cat: 'all',     // active category filter
-    query: '',      // search query
-    mode: 'view'    // 'view' | 'edit'
+    active: null,        // currently open note object
+    expandedCats: [],    // expanded category names
+    query: '',           // search query
+    mode: 'view'         // 'view' | 'edit'
   };
 
   /* ── Content helpers ── */
@@ -24,38 +24,25 @@ var App = (function () {
     return saved !== null ? saved : getOriginal(note.id);
   }
 
-  function filtered() {
-    var q = state.query.toLowerCase();
-    return state.notes.filter(function (n) {
-      if (state.cat !== 'all' && n.category !== state.cat) return false;
-      if (!q) return true;
-      return n.title.toLowerCase().indexOf(q) >= 0
-        || n.tags.some(function (t) { return t.toLowerCase().indexOf(q) >= 0; })
-        || (n.description || '').toLowerCase().indexOf(q) >= 0;
-    });
-  }
-
   /* ── Sidebar ── */
   function renderSidebar() {
     var mod = NoteStorage.getModifiedIds();
     var activeId = state.active ? state.active.id : null;
 
     document.getElementById('catList').innerHTML =
-      UI.renderCategories(state.notes, state.cat);
+      UI.renderAccordion(state.notes, state.expandedCats, activeId, mod, state.query);
 
-    document.getElementById('notesList').innerHTML =
-      UI.renderList(filtered(), activeId, mod);
-
-    /* Category clicks */
-    document.querySelectorAll('#catList .cat-item').forEach(function (el) {
+    /* Category header clicks — single-open accordion */
+    document.querySelectorAll('.acc-header').forEach(function (el) {
       el.addEventListener('click', function () {
-        state.cat = el.dataset.cat;
+        var cat = el.parentElement.dataset.cat;
+        state.expandedCats = state.expandedCats[0] === cat ? [] : [cat];
         renderSidebar();
       });
     });
 
     /* Note item clicks */
-    document.querySelectorAll('#notesList .note-item').forEach(function (el) {
+    document.querySelectorAll('.acc-notes .note-item').forEach(function (el) {
       el.addEventListener('click', function () {
         var note = state.notes.find(function (n) {
           return n.id === parseInt(el.dataset.id, 10);
@@ -69,6 +56,7 @@ var App = (function () {
   function openNote(note) {
     state.active = note;
     state.mode = 'view';
+    state.expandedCats = [note.category];
     var content = getContent(note);
     var isModified = NoteStorage.isModified(note.id);
 
