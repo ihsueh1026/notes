@@ -79,18 +79,20 @@ var App = (function () {
     var codeEl = document.getElementById('codeBlock');
     if (codeEl) Prism.highlightElement(codeEl);
 
-    /* Copy code button */
+    /* Copy code button (absent for lang === 'links') */
     var copyCodeBtn = document.getElementById('copyCodeBtn');
-    copyCodeBtn.addEventListener('click', function () {
-      navigator.clipboard.writeText(content).then(function () {
-        copyCodeBtn.textContent = '已複製!';
-        copyCodeBtn.classList.add('copied');
-        setTimeout(function () {
-          copyCodeBtn.textContent = '複製';
-          copyCodeBtn.classList.remove('copied');
-        }, 2000);
+    if (copyCodeBtn) {
+      copyCodeBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(content).then(function () {
+          copyCodeBtn.textContent = '已複製!';
+          copyCodeBtn.classList.add('copied');
+          setTimeout(function () {
+            copyCodeBtn.textContent = '複製';
+            copyCodeBtn.classList.remove('copied');
+          }, 2000);
+        });
       });
-    });
+    }
 
     /* Copy all button */
     var copyAllBtn = document.getElementById('copyAllBtn');

@@ -70,5 +70,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'bash',
     description: 'Gerrit SSH review/submit、flush-caches、create-project、factory/dyson/sdx12 push'
+  },
+  {
+    id: 9,
+    title: 'Julius Docs 連結',
+    category: 'Docs',
+    tags: ['docs', 'qcom', 'yocto', 'mtk', 'download', 'internal'],
+    date: '2026-04-28',
+    lang: 'links',
+    description: '內網 Julius Docs — QCOM / Yocto / MTK / Download 各章節連結'
   }
 ];

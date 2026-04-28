@@ -26,7 +26,8 @@ var UI = (function () {
   }
 
   var ICONS = {
-    edit:   '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+    edit:    '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+    extlink: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
     copy:   '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     save:   '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
     reset:  '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/>',
@@ -66,6 +67,42 @@ var UI = (function () {
     }).join('');
   }
 
+  /* ── Links renderer (lang === 'links') ── */
+  function renderLinksContent(content) {
+    var lines = content.split('\n');
+    var html = '<div class="links-panel">';
+    var groupOpen = false;
+
+    function closeGroup() { if (groupOpen) { html += '</div>'; groupOpen = false; } }
+    function openGroup()  { if (!groupOpen) { html += '<div class="links-group">'; groupOpen = true; } }
+
+    lines.forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      if (/^# /.test(line)) {
+        closeGroup();
+        html += '<div class="links-title">' + esc(line.slice(2)) + '</div>';
+      } else if (/^## /.test(line)) {
+        closeGroup();
+        html += '<div class="links-h2">' + esc(line.slice(3)) + '</div>';
+      } else if (/^### /.test(line)) {
+        closeGroup();
+        html += '<div class="links-h3">' + esc(line.slice(4)) + '</div>';
+      } else if (/^https?:\/\//.test(line)) {
+        openGroup();
+        var parts = line.replace(/\/$/, '').split('/');
+        var raw = decodeURIComponent(parts[parts.length - 1]).replace(/_/g, ' ');
+        var label = raw || line;
+        html += '<a href="' + esc(line) + '" class="link-btn" target="_blank" rel="noopener">'
+             + svgIcon(ICONS.extlink, 11) + esc(label) + '</a>';
+      }
+    });
+
+    closeGroup();
+    html += '</div>';
+    return html;
+  }
+
   /* ── Note View (read mode) ── */
   function renderNoteView(note, content, isModified) {
     var modBadge = isModified
@@ -88,18 +125,20 @@ var UI = (function () {
       + '</div>'
       + '<div class="note-body">'
       + (note.description ? '<p class="note-desc">' + esc(note.description) + '</p>' : '')
-      +   '<div class="code-wrap">'
-      +     '<div class="code-header">'
-      +       '<div class="code-header-left">'
-      +         '<span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>'
-      +         '<span class="code-lang">' + esc(note.lang) + '</span>'
-      +       '</div>'
-      +       '<button class="copy-btn" id="copyCodeBtn">複製</button>'
-      +     '</div>'
-      +     '<pre><code id="codeBlock" class="language-' + esc(note.lang) + '">'
-      +       esc(content)
-      +     '</code></pre>'
-      +   '</div>'
+      + (note.lang === 'links'
+          ? renderLinksContent(content)
+          : '<div class="code-wrap">'
+            +   '<div class="code-header">'
+            +     '<div class="code-header-left">'
+            +       '<span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>'
+            +       '<span class="code-lang">' + esc(note.lang) + '</span>'
+            +     '</div>'
+            +     '<button class="copy-btn" id="copyCodeBtn">複製</button>'
+            +   '</div>'
+            +   '<pre><code id="codeBlock" class="language-' + esc(note.lang) + '">'
+            +     esc(content)
+            +   '</code></pre>'
+            + '</div>')
       + '</div>';
   }
 
