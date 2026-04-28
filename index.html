@@ -1386,6 +1386,124 @@ QBI 內部 enum (qbi_qmi_svc_e) 與 QMI wire service ID 對照：
 供 qbi_svc_sms_pdu.c 使用。
 </script>
 
+<script type="text/plain" id="nc-13">
+# QmuxMdm 驅動架構
+
+## 概述
+
+Qualcomm Windows KMDF 核心驅動套件，在 Windows AP 與 Qualcomm 數據機之間
+提供 QMI（Qualcomm MSM Interface）通道。包含三個 .sys 驅動。
+
+## 專案結構
+
+```
+QmuxMdm.sln
+├── Qmux/            → qcqmux.sys       主驅動 / 上層
+├── QmuxUsb/         → qcqmuxusb.sys    USB 傳輸下層 filter
+├── QmuxPCIe/        → qcqmuxpcie.sys   PCIe/MHI 傳輸下層 filter
+└── QmuxMdmPackage/  → .inf 封裝
+```
+
+## 分層架構
+
+```
+User/Kernel QMI clients (QCCI or Gobi)
+         │  DeviceIoControl IOCTL
+         ▼
+┌────────────────────────────────────┐
+│          qcqmux.sys (Qmux)         │  Function driver
+│  - QMI QMUX multiplexer            │  Device: \\.\QMUX\QmuxDevice
+│  - 管理多條 RMNET conn_id          │  GUID: 7DCB3244-C836-4A0C
+│  - QMI CTL 協定 (sync/ver info)   │
+│  - Bus PDO → GNSS / NetAdapter    │
+│  - Worker thread 非同步處理        │
+└──────────────┬─────────────────────┘
+               │ IOCTL_INTERNAL_QMUX_INTERCONNECT_*
+               │ 共享 Kernel Event 信號
+               ▼
+    ┌──────────┴──────────┐
+    │                     │
+qcqmuxusb.sys       qcqmuxpcie.sys       ← Lower filter（擇一）
+(USB 傳輸)           (PCIe/MHI 傳輸)
+USB Bulk IN/OUT      pcieio_public API
++ Interrupt pipe     MHI interface
+    │                     │
+    └──────────┬──────────┘
+               ▼
+         Qualcomm Modem
+```
+
+## Qmux ↔ 傳輸層介面（QmuxPublic.h）
+
+上層 Qmux 透過 Internal IOCTL 控制下層，透過共享 Kernel Event 收資料通知：
+
+| IOCTL | 方向 | 用途 |
+|-------|------|------|
+| IOCTL_INTERNAL_QMUX_INTERCONNECT_OPEN_PORT  | Qmux → 傳輸 | 開啟，傳入 hReadEvent/hOpenEvent/hCloseEvent |
+| IOCTL_INTERNAL_QMUX_INTERCONNECT_CLOSE_PORT | Qmux → 傳輸 | 關閉連線 |
+| IOCTL_INTERNAL_QMUX_INTERCONNECT_RX_PEEK    | Qmux → 傳輸 | 查詢是否有資料待讀 |
+| hReadEvent / hOpenEvent / hCloseEvent       | 傳輸 → Qmux | signal 通知 |
+
+## Qmux 對外 IOCTL 介面（qmux_common.h）
+
+| IOCTL | 用途 | 用戶端 |
+|-------|------|--------|
+| IOCTL_QMUX_CLIENT_INIT              | 初始化 client               | QCCI / Gobi |
+| IOCTL_QMUX_TX_MSG                   | 傳 QMI 訊息到數據機         | QCCI / Gobi |
+| IOCTL_QMUX_RX_MSG                   | 從數據機收 QMI 訊息         | QCCI / Gobi |
+| IOCTL_QMUX_CLIENT_RELEASE           | 釋放 client                 | QCCI / Gobi |
+| IOCTL_QMUX_ALLOC_CLIENT_ID          | 申請 QMI client ID          | Gobi only   |
+| IOCTL_QMUX_QMI_GET_MEID             | 取得 MEID                   | Gobi only   |
+| IOCTL_QMUX_QMI_GET_SVC_VER[_EX]    | 取得 service 版本           | Gobi only   |
+| IOCTL_QMUX_QMI_CTL_SET_DATA_FORMAT  | 設 QoS / link layer 格式   | —           |
+| IOCTL_QMUX_READ_OOB                 | 讀 OOB 事件（server 上下線）| —           |
+
+## QMI Connection ID（RMNET 通道）
+
+qmi_connection_id_type 定義多條虛擬 QMI 通道：
+
+| 範圍                          | 對應 SMD/SDIO 通道          |
+|-------------------------------|-----------------------------|
+| RMNET_0 ~ 8                   | SMD DATA5 ~ DATA16_CNTL     |
+| SIO_PORT_SDIO_MUX_A2_REV_IP_0~8 | SMD DATA23 ~ DATA31_CNTL |
+| RMNET_SDIO_0 ~ 7             | SDIO0 ~ SDIO7_CNTL          |
+| RMNET_12, 13, PROXY           | 額外通道                    |
+
+## 關鍵資料結構
+
+| 結構                    | 檔案               | 用途                                          |
+|-------------------------|--------------------|-----------------------------------------------|
+| QMUX_DEVICE_CONTEXT     | qmux.h             | 主驅動裝置實例：連線、queue、client list、MHI |
+| CLIENT_CONTEXT          | qmux.h             | 每個 file handle 的 read/write/OOB queue      |
+| QmuxClientInfo          | qmux.h             | service_id、client_id、版本、QCCI/Gobi 類型   |
+| InterconnectIoTargetInfo| qmux.h             | 每條 conn_id 的 IoTarget 及 rx buffer         |
+| USB_CONTEXT             | UsbOperations.h    | USB pipes、read packet pool（8 × 8KB）        |
+| QMUXPCIE_DEVICE_CONTEXT | QmuxPCIe/Device.h  | PCIe IO request pool（8 × 8KB）、pcieio ctx   |
+
+## INF 安裝邏輯
+
+### USB 路徑
+- 匹配：USB\VID_05C6&PID_9085&MI_04 或 USB\VID_05C6&PID_90E2&MI_02
+- qcqmuxusb.sys → LowerFilters
+- qcqmux.sys → Associated Service（function driver）
+
+### PCIe 路徑
+- 匹配：{3a4d657c-0a42-4501-9627-ba1b76ffc39d}\QcQmux_OEM_MUST_CHANGE_THIS
+- qcqmuxpcie.sys → LowerFilters
+- qcqmux.sys → Associated Service
+
+### Bus PDO
+- GUID: {7DCB3244-C836-4A0C-A1E9-BD68D385AA2B}
+- 子裝置：GNSS PDO、NetAdapter PDO（OEM 需設定）
+
+## Client 類型
+
+| 類型 | 說明 |
+|------|------|
+| QCCI | 標準 QMI QCCI 客戶端（現代路徑）|
+| Gobi | 舊式 Gobi 驅動客戶端（legacy，需 ALLOC_CLIENT_ID 等額外 IOCTL）|
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

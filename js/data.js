@@ -106,5 +106,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'markdown',
     description: 'QBI (Qualcomm MBIM Interface) 架構分析 — framework、platform、svc、資料流、Action 狀態機'
+  },
+  {
+    id: 13,
+    title: 'QmuxMdm 驅動架構',
+    category: 'Docs',
+    tags: ['qmux', 'qmi', 'kmdf', 'wdf', 'windows', 'driver', 'usb', 'pcie', 'qualcomm'],
+    date: '2026-04-28',
+    lang: 'markdown',
+    description: 'QmuxMdm Windows KMDF 驅動套件架構 — qcqmux/qcqmuxusb/qcqmuxpcie 三驅動、IOCTL 介面、RMNET 通道、INF 安裝邏輯'
   }
 ];
