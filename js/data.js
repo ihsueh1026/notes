@@ -97,5 +97,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'bash',
     description: 'Shell alias 設定 — git 操作、Gerrit push、SSH 快速連線、常用工具'
+  },
+  {
+    id: 12,
+    title: 'MBIM / QBI 架構',
+    category: 'Docs',
+    tags: ['mbim', 'qbi', 'qmi', 'qualcomm', 'modem', 'architecture'],
+    date: '2026-04-28',
+    lang: 'markdown',
+    description: 'QBI (Qualcomm MBIM Interface) 架構分析 — framework、platform、svc、資料流、Action 狀態機'
   }
 ];

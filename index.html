@@ -1212,6 +1212,180 @@ alias aliases="cat ~/.bash_aliases"
 #
 </script>
 
+<script type="text/plain" id="nc-12">
+# MBIM / QBI 架構
+
+## 概述
+
+Qualcomm QBI (Qualcomm MBIM Interface) 實作，橋接主機端 MBIM 協定與數據機端 QMI 介面。
+運作於 Linux 使用者空間，透過 USB 與 host 溝通，透過 SMD 與數據機溝通。
+
+## 目錄結構
+
+```
+mbim/
+├── qbi/
+│   ├── framework/   # 核心框架（task、msg、txn、svc、qmi）
+│   ├── platform/    # Linux 平台實作
+│   ├── svc/         # 21 個 Device Service 實作
+│   └── test/        # 單元測試框架
+├── qmi_svc/         # QMI IDL 產生的 message 定義
+└── wmsts/           # SMS PDU 編解碼工具
+```
+
+## 架構分層
+
+```
+Host (USB/MBIM)
+      │
+      ▼
+Host Controller Layer    qbi_hc_linux.c
+      │
+      ▼
+Message Layer            qbi_msg.c/.h       MBIM 封包解析/組裝
+      │ 建立 qbi_txn_s
+      ▼
+Task Layer (事件迴圈)    qbi_task.c/.h      單一執行緒
+      │
+      ▼
+Service Dispatch Layer   qbi_svc.c/.h       UUID+CID 路由
+      │
+   ┌──┴──┐
+   ▼     ▼
+Device  QMI Layer        qbi_qmi.c / qbi_qmi_txn.c / qbi_qmux.c
+Services              │
+(svc/)                ▼
+                   Modem (QMI/QCCI/SMD)
+```
+
+## framework/ 核心模組
+
+| 模組          | 職責                                              |
+|---------------|---------------------------------------------------|
+| qbi_task      | 主事件迴圈；命令類型：RX_DATA、QMI_RSP、QMI_IND  |
+| qbi_msg       | MBIM 協定：OPEN/CLOSE/COMMAND_MSG 解析與回應組裝  |
+| qbi_txn       | 交易生命週期管理；每個 MBIM 命令對應一個 qbi_txn_s|
+| qbi_svc       | 服務註冊/分派；維護 CID dispatch table            |
+| qbi_qmi       | QMI client 管理，透過 QCCI 與數據機通訊           |
+| qbi_qmi_txn   | QMI 子交易（掛在父 qbi_txn_s 下）                |
+| qbi_qmux      | QMUX 協定層（EXT_QMUX over MBIM）                |
+
+## platform/ (Linux)
+
+| 模組                | 職責                       |
+|---------------------|----------------------------|
+| qbi_os_linux        | pthread mutex/thread/timer |
+| qbi_hc_linux        | USB MBIM 裝置讀寫          |
+| qbi_qmux_smd_linux  | SMD 共享記憶體 QMI 傳輸    |
+| qbi_nv_store_linux  | 非揮發性儲存（檔案系統）    |
+| qbi_fwupd_linux     | 韌體更新                   |
+| qbi_log_qxdm        | QXDM 診斷日誌              |
+
+## Device Services（svc/）
+
+每個 service 向框架註冊 qbi_svc_cfg_s：UUID、dispatch_tbl、open/close_fcn、qmi_reg_tbl
+
+| ID | Service   | 說明                          |
+|----|-----------|-------------------------------|
+|  1 | BC        | Basic Connectivity            |
+|  2 | SMS       | SMS 收發                      |
+|  3 | USSD      | Unstructured SS Data          |
+|  4 | PB        | Phonebook                     |
+|  5 | STK       | SIM Toolkit                   |
+|  6 | AUTH      | Authentication (AKA/SIM)      |
+|  7 | EXT_QMUX  | QMUX over MBIM                |
+|  9 | MSHSD     | MS Host Shutdown              |
+| 10 | QMBE      | QTI MBIM Extensibility        |
+| 11 | MSFWID    | MS Firmware ID                |
+| 12 | ATDS      | AT&T Device Services          |
+| 13 | QDU       | Qualcomm Device Update        |
+| 14 | MSUICC    | MS UICC / SIM                 |
+| 15 | BC_EXT    | MS Basic Connectivity Ext.    |
+| 16 | MSSAR     | Selective Absorption Rate     |
+| 17 | VOICE_EXT | MS Voice Extension            |
+| 18 | QIMBE     | QTI Internal MBIMEx           |
+| 19 | OOBE      | Out of Box Experience         |
+| 20 | CS        | Carrier Subsidy (SIM lock)    |
+| 21 | CEIMBE    | Linux AT over MBIM            |
+
+## 資料流
+
+```
+MBIM_COMMAND_MSG (host)
+  → qbi_msg 解析 → qbi_txn_s
+  → qbi_task_cmd_send(RX_DATA)
+  → qbi_svc_dispatch → CID handler → qbi_svc_action_e
+
+SEND_QMI_REQ → qbi_qmi 發請求 → 等 QMI_RSP callback
+SEND_RSP     → qbi_msg 組 MBIM_COMMAND_DONE → host
+```
+
+## Action 狀態機
+
+| Action          | 含義                                       |
+|-----------------|--------------------------------------------|
+| SEND_QMI_REQ    | 分派 qmi_txns 中的 QMI 請求並等待回應      |
+| WAIT_ASYNC_RSP  | 等待非同步回應                             |
+| SEND_RSP        | 回應就緒，送給 host                        |
+| ABORT           | 錯誤，通知 host 並釋放交易                 |
+
+## qbi_txn_s 核心欄位
+
+```c
+typedef struct qbi_txn_struct {
+  qbi_ctx_s            *ctx;
+  uint32                iid;           // 內部追蹤 ID
+  qbi_svc_id_e          svc_id;
+  uint32                txn_id;        // MBIM TransactionId
+  uint32                cmd_type;      // QUERY / SET / EVENT / INTERNAL
+  uint32                cid;
+  uint32                status;
+  qbi_util_buf_s        req;           // request InformationBuffer
+  qbi_util_buf_s        rsp;           // response 固定長度
+  qbi_util_buf_chain_s  rsp_databuf;   // response DataBuffer（變長）
+  qbi_util_list_s       qmi_txns;      // 子 QMI 交易列表
+  uint32                qmi_txns_pending;
+  void                 *info;          // 服務自訂狀態
+  qbi_os_time_ms_t      timeout;
+} qbi_txn_s;
+```
+
+## QMI Indication 管理
+
+- **靜態** qbi_svc_ind_reg_static：服務 open 時常駐
+- **動態** qbi_svc_ind_reg_dynamic：有時效性，等待特定事件
+- **Reference count** qbi_svc_ind_qmi_ref_cnt_*：多個 CID 共享同一 indication 時，
+  透過 ref count 決定是否實際向數據機訂閱/取消訂閱
+
+## qmi_svc/ QMI 服務定義（IDL 產生）
+
+QBI 內部 enum (qbi_qmi_svc_e) 與 QMI wire service ID 對照：
+
+| QBI enum ID | 符號           | Wire ID (hex) | Wire ID (dec) | 說明                              |
+|-------------|----------------|---------------|---------------|-----------------------------------|
+|  0          | DMS            | 0x02          |  2            | Device Management Service         |
+|  1          | NAS            | 0x03          |  3            | Network Access Service            |
+|  2          | WMS            | 0x05          |  5            | Wireless Messaging Service        |
+|  3          | UIM            | 0x0B          | 11            | User Identity Module              |
+|  4          | CAT (v2)       | 0x0A          | 10            | Card Application Toolkit v2       |
+|  5          | PBM            | 0x0C          | 12            | Phonebook Manager                 |
+|  6          | Voice (v2)     | 0x09          |  9            | Voice Service v2                  |
+|  7          | WDA            | 0x1A          | 26            | Wireless Data Administrative Svc  |
+|  8          | SSCTL          | 0x2B          | 43            | Subsystem Control Service         |
+|  9          | DSD            | 0x2A          | 42            | Data System Determination         |
+| 10          | PDC            | 0x24          | 36            | Persistent Device Configuration   |
+| 11          | SAR            | 0x11          | 17            | Specific Absorption Rate          |
+| 12          | TS             | 0x17          | 23            | Thermal Sensor Service            |
+| 13 ~ 13+N   | WDS (×sessions)| 0x01          |  1            | Wireless Data Service (多 client) |
+| —           | DPM            | 0x2F          | 47            | Data Port Mapper                  |
+| —           | CTL            | 0x00          |  0            | QMI Control Service               |
+
+## wmsts/
+
+獨立 SMS PDU 編解碼函式庫，支援 GSM/UMTS（3GPP）與 CDMA（3GPP2），
+供 qbi_svc_sms_pdu.c 使用。
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
