@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ali's Notes</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="brand-row">
+      <div class="brand">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Ali's Notes
+      </div>
+      <div class="brand-actions">
+        <button class="icon-btn" id="importBtn" title="匯入 JSON">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="exportBtn" title="匯出 JSON">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="8 17 12 21 16 17"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search" type="text" placeholder="搜尋筆記...">
+    </div>
+  </div>
+
+  <div class="section-label">分類</div>
+  <div class="cat-list" id="catList"></div>
+
+  <div class="section-label">筆記</div>
+  <div class="notes-list" id="notesList"></div>
+</aside>
+
+<!-- ── Main ── -->
+<main class="main">
+  <div id="mainContent">
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <p>選擇左側筆記來查看內容</p>
+    </div>
+  </div>
+</main>
+
+<!-- ── Note content data ── -->
+<script type="text/plain" id="nc-1">@echo off
+
+set current_path=%~dp0
+set cellular_interface="cellular 137"
+set cellular_service="DW5826eService"
+set adb=%current_path%adb
+
+:menu
+echo /*==============================================================================*/
+echo /*  1.mbim_info  2.driver_info  3.device_manager  4.at_commands   5.inf_verify  */
+echo /* 11.wireshark 12.telephony   13.textanalysis   14.teraterm     15.PEP         */
+echo /* 21.sku_set   22.test_set    23.driver_del     24.service      25.ACPI        */
+echo /* 31.nettrace  32.driver_log  33.QXDM           34.flash        35.adb         */
+echo /* 41.traceview 42.usbview                       88.exit         99.edit        */
+echo /*===============================================================v2.0===========*/
+set /p choice=select (1-99):
+
+if "%choice%"=="1" goto menu_mbim
+if "%choice%"=="2" goto driver_info
+if "%choice%"=="3" goto dm_open
+if "%choice%"=="4" goto menu_at_commands
+if "%choice%"=="5" goto inf_verify
+if "%choice%"=="11" goto wireshark_open
+if "%choice%"=="12" goto TelephonyTool
+if "%choice%"=="13" goto TextAnalysisTool.NET
+if "%choice%"=="14" goto teraterm
+if "%choice%"=="15" goto menu_pep
+if "%choice%"=="21" goto sku_set
+if "%choice%"=="22" goto test_set
+if "%choice%"=="23" goto menu_driver_del
+if "%choice%"=="24" goto menu_service
+if "%choice%"=="25" goto menu_acpi
+if "%choice%"=="31" goto menu_nettrace
+if "%choice%"=="32" goto menu_driver_log
+if "%choice%"=="33" goto qxdm
+if "%choice%"=="34" goto menu_flash
+if "%choice%"=="35" goto menu_adb
+if "%choice%"=="41" goto traceview
+if "%choice%"=="42" goto usbview
+if "%choice%"=="88" goto exit
+if "%choice%"=="99" goto edit
+
+echo Input invalid!
+pause
+goto menu
+
+:menu_at_commands
+echo /*==============================================================================*/
+echo /* 1.AT*UCOMP=1,1,101F   2.AT*BBOOTHOLD=edl  3.AT*MPCFCCAUTH?  4.AT*BRESET      */
+echo /* 9.back                                                                       */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto UCOMP
+if "%choice%"=="2" goto BBOOTHOLD
+if "%choice%"=="3" goto MPCFCCAUTH
+if "%choice%"=="4" goto BRESET
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_at_commands
+
+:menu_mbim
+echo /*==============================================================================*/
+echo /* 1.radio   2.interfaces  3.signal  4.ready_info  9.back                       */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto radio
+if "%choice%"=="2" goto interfaces
+if "%choice%"=="3" goto signal
+if "%choice%"=="4" goto ready_info
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_mbim
+
+:menu_nettrace
+echo /*==============================================================================*/
+echo /* 1.start  2.stop  3.del_registry  9.back                                      */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto nettrace_start
+if "%choice%"=="2" goto nettrace_stop
+if "%choice%"=="3" goto nettrace_delete
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_nettrace
+
+:menu_driver_log
+echo /*==============================================================================*/
+echo /* 1.start  2.stop  9.back                                                      */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto driver_log_start
+if "%choice%"=="2" goto driver_log_stop
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_driver_log
+
+:menu_driver_del
+echo /*==============================================================================*/
+echo /* 1.DW5826_del  2.driver_del  9.back                                           */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto DW5826_del
+if "%choice%"=="2" goto driver_del
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_driver_del
+
+:menu_service
+echo /*==============================================================================*/
+echo /* 1.start  2.stop  3.check  4.fw_disable  5.fw_enable  9.back                  */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto service_start
+if "%choice%"=="2" goto service_stop
+if "%choice%"=="3" goto service_check
+if "%choice%"=="4" goto fw_disable
+if "%choice%"=="5" goto fw_enable
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_service
+
+:menu_flash
+echo /*==============================================================================*/
+echo /* 1.start  2.check  9.back                                                     */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto flash_start
+if "%choice%"=="2" goto flash_check
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_flash
+
+:menu_adb
+echo /*========================================================================*/
+echo /* 1.shell   2.w_disable   3.qbi_log_start  4.qbi_log_stop  5.qbi_log_pull*/
+echo /* 6.remount 7.qbi_log_size                                 9.back        */
+echo /*========================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto shell
+if "%choice%"=="2" goto w_disable
+if "%choice%"=="3" goto qbi_log_start
+if "%choice%"=="4" goto qbi_log_stop
+if "%choice%"=="5" goto qbi_log_pull
+if "%choice%"=="6" goto remount_root
+if "%choice%"=="7" goto qbi_log_size
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_adb
+
+:menu_acpi
+echo /*==============================================================================*/
+echo /* 1.dump  9.back                                                               */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto acpi_dump
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_acpi
+
+:menu_pep
+echo /*==============================================================================*/
+echo /* 1.PEP checker  9.back                                                        */
+echo /*==============================================================================*/
+set /p choice=select (1-9):
+
+if "%choice%"=="1" goto pep_checker
+if "%choice%"=="9" goto menu
+
+echo Input invalid!
+pause
+goto menu_pep
+
+:UCOMP
+start "" "%current_path%M2PE_Tool\M2PE_Tool.exe" AT*UCOMP=1,1,101F
+goto menu
+
+:BBOOTHOLD
+start "" "%current_path%M2PE_Tool\M2PE_Tool.exe" AT*BBOOTHOLD=edl
+goto menu
+
+:MPCFCCAUTH
+start "" "%current_path%M2PE_Tool\M2PE_Tool.exe" AT*MPCFCCAUTH?
+goto menu
+
+:BRESET
+start "" "%current_path%M2PE_Tool\M2PE_Tool.exe" AT*BRESET
+goto menu
+
+:radio
+netsh mbn show radio %cellular_interface%
+netsh mbn show connection %cellular_interface%
+goto menu
+
+:interfaces
+netsh mbn show interfaces
+goto menu
+
+:signal
+netsh mbn show signal %cellular_interface%
+goto menu
+
+:ready_info
+netsh mbn show readyinfo %cellular_interface%
+goto menu
+
+:nettrace_start
+netsh trace start wireless_dbg,provisioning overwrite=yes persist=yes level=5 capture=yes maxSize=0 filemode=single
+goto menu
+
+:nettrace_stop
+netsh trace stop
+goto menu
+
+:nettrace_delete
+echo Delete all NetTrace folder under "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger"
+echo HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger | clip
+regedit.exe
+goto menu
+
+:commands
+echo AT*UCOMP=1,1,101F
+echo AT*BBOOTHOLD=edl
+echo AT*MPCFCCAUTH?
+echo AT*BPCINFO?
+echo AT*BRESET
+goto menu
+
+:sku_set
+reg add "HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\BIOS" /v "SystemSKU" /t REG_SZ /d "0CB2" /f
+goto menu
+
+:test_set
+bcdedit /set testsigning on
+echo Reboot the machine to enable Testing mode.
+pause
+goto menu
+
+:driver_info
+echo Driver info under "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USB\VID_413C&PID_8217&MI_XX"
+echo HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USB\ | clip
+regedit.exe
+goto menu
+
+:dm_open
+start devmgmt.msc
+goto menu
+
+:wireshark_open
+echo Add filter parameters "--p=Microsoft-Windows-Wmbclass-Opn"
+echo netsh trace convert .\netracelog.etl .\netracelog.txt
+echo Get-Content netracelog.txt | Where-Object {$_ -notmatch "No Format Information found"} | Set-Content netracelog_clean.txt
+start "" "%current_path%WiresharkPortable64\WiresharkPortable64.exe"
+goto menu
+
+:TelephonyTool
+start "" "%current_path%TelephonyTool\TelephonyTool.exe"
+goto menu
+
+:TextAnalysisTool.NET
+start "" "%current_path%TextAnalysisTool.NET\TextAnalysisTool.NET.exe"
+goto menu
+
+:teraterm
+start "" "C:\Program Files (x86)\teraterm5\ttermpro.exe"
+goto menu
+
+:DW5826_del
+start "" "C:\Program Files (x86)\Dell Inc\DW5826e\uninstall.exe"
+goto menu
+
+:driver_del
+start "" "%current_path%DriverStoreExplorer.v0.11.92\Rapr.exe"
+goto menu
+
+:driver_log_start
+%current_path%\Host_driver_log\"Enable host log.bat"
+goto menu
+
+:driver_log_stop
+echo Delete all setting
+reg delete "HKLM\system\ControlSet001\Control\WMI\Autologger\QNET" /f
+reg delete "HKLM\system\ControlSet001\Control\WMI\Autologger\MHI" /f
+pause
+goto menu
+
+:inf_verify
+set directory=%current_path%\infverify
+for %%f in ("%directory%\*.inf") do (
+  %current_path%infverify\infverif.exe /h /v %%f
+)
+goto menu
+
+:qxdm
+start "" "C:\Program Files\Qualcomm\QXDM5\QXDM.exe" /config "%current_path%\QXDM\Default+QBI.dmc"
+goto menu
+
+:service_start
+sc start %cellular_service%
+goto menu
+
+:service_stop
+sc stop %cellular_service%
+goto menu
+
+:service_check
+sc query %cellular_service% | findstr /i "RUNNING"
+if %errorlevel% equ 0 (
+  echo %cellular_service% start
+) else (
+  echo %cellular_service% stop
+)
+goto menu
+
+:fw_disable
+echo "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Palcom\DW5826eService"
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Palcom\DW5826eService" /v "FWUpdate" /t REG_SZ /d "No" /f
+goto menu
+
+:fw_enable
+echo "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Palcom\DW5826eService"
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Palcom\DW5826eService" /v "FWUpdate" /t REG_SZ /d "auto" /f
+goto menu
+
+:flash_start
+start "" "%current_path%UT_Flash_Tool\ZXL1_ZXL2_FlashTool_V2.0.3.8_4K\Tool\FlashTool.exe"
+goto menu
+
+:flash_check
+start "" "%current_path%UT_Flash_Tool\ZXL1_ZXL2_FlashTool_V2.0.3.8_4K\UMI\UMI.exe"
+goto menu
+
+:shell
+start .
+start cmd /k "%adb% wait-for-device shell"
+goto menu
+
+:remount_root
+start .
+start cmd /k "%adb% wait-for-device && %adb% shell mount -o remount,rw /dev/root /"
+goto menu
+
+:w_disable
+%adb% wait-for-device && %adb% shell cat /sys/kernel/debug/gpio && %adb% shell cat /data/persist/rfs/shared/w_disable
+goto menu
+
+:qbi_log_start
+%adb% wait-for-device && %adb% shell touch /data/mbimd/qbi_enable_logging &&  %adb% shell "printf '\x80\x84\x1E\x00' > /data/mbimd/qbi_enable_logging" && %adb% shell chown radio:radio /data/mbimd/qbi_enable_logging
+echo "Reboot module to start logging"
+goto menu
+
+:qbi_log_stop
+%adb% wait-for-device && %adb% shell rm -rf /data/mbimd/qbi_enable_logging && %adb% shell rm -rf /data/mbimd/qbi_current_log_file.txt && %adb% shell rm -rf /data/mbimd/qbi_previous_file.txt && %adb% shell rm -rf /data/mbimd/*.txt
+goto menu
+
+:qbi_log_pull
+%adb% wait-for-device && %adb% pull /data/mbimd/qbi_current_log_file.txt %current_path%\log\qbi_current_log_file.txt && %adb% pull /data/mbimd/qbi_previous_log_file.txt %current_path%\log\qbi_previous_log_file.txt && %adb% pull /data/mbimd/qbi_oldest_log_file.txt %current_path%\log\qbi_oldest_log_file.txt
+goto menu
+
+:qbi_log_size
+echo adb shell "printf '\x80\x84\x1E\x00' ^> /data/mbimd/qbi_enable_logging"
+goto menu
+
+:acpi_dump
+echo ACPI Dump...
+start "ACPI Dump" cmd /k "cd /d "%current_path%iasl-win-20250404\" && del *.dat *.dsl /q && acpidump.exe -b -o acpi_tables.dat && iasl.exe -d *.dat && del *.dat"
+goto menu
+
+:pep_checker
+echo PEP Checker...
+start "PEP Checker" cmd /k "cd /d "%current_path%PEP Checker v2.2.2.3\" && PEPChecker.exe"
+goto menu
+
+:traceview
+start "" "%current_path%traceview\traceview.exe"
+goto menu
+
+:usbview
+start "" "%current_path%usbview\usbview.exe"
+goto menu
+
+:exit
+exit
+
+:edit
+notepad "%current_path%_mbn_show.bat"
+pause</script>
+
+<!-- ── Note 2: Repo Init ── -->
+<script type="text/plain" id="nc-2"># === PDK / WearOS ===
+# bluefish (IMR1)
+repo init -u https://compal-private.googlesource.com/platform/manifest -b compal-bluefish-rvc-wear-imr1-dev
+
+# blowfish IMR2
+repo init -u https://dyson-private.googlesource.com/platform/manifest -b dyson-compal-rvc-wear-imr2-blowfish-dev
+repo init -u https://dyson-private.googlesource.com/platform/manifest -b dyson-compal-rvc-wear-imr2-blowfish-5100-evb
+
+# blowfish IMR3
+repo init -u https://dyson-private.googlesource.com/platform/manifest -b dyson-compal-rvc-wear-imr3-blowfish-5100-dev
+
+# FSK (kr3 / Monaco / blowfish)
+repo init -u https://dyson-private.googlesource.com/platform/manifest -b dyson-compal-tm-wear-kr3-monaco
+repo init -u https://dyson-private.googlesource.com/platform/manifest -b dyson-compal-tm-wear-kr3-blowfish
+repo init -u git://10.113.8.172/wearos/manifests.git -b SW5100.LW.2.0-MONACO-RETAIL
+repo init -u git://10.113.8.172/wearos/manifests.git -b SDM429W.LW.2.0-00030-DBW5
+
+# wearone (HMR1)
+repo init -u https://compal-private-review.googlesource.com/platform/manifest -b compal-icefish-pi-wear-hmr1-dev
+
+# === Kernel ===
+repo init -u git://10.113.8.172/sdm429w_kernel/manifests.git -b sdm429w-common-4.14-bluefish
+repo init -u https://dyson-private.googlesource.com/kernel/manifest -b dyson-compal-rvc-wear-imr3-blowfish-5100-dev
+repo init -u https://dyson-private.googlesource.com/kernel/manifest -b dyson-compal-tm-wear-kr3-blowfish
+repo init -u git://10.113.8.172/sw5100_kernel/manifests.git -b SW5100.LW.1.0-RETAIL-DDW1
+repo init -u git://10.113.8.172/sw5100_kernel/manifests.git -b SW5100.LW.2.0-MONACO-RETAIL
+BUILD_CONFIG=build.config ./build/build.sh 2>&1 | tee makelog
+
+# === Bootloader ===
+repo init -u git://10.113.8.172/sdm429w_bootloader/manifests.git -b SDM429W.LW.2.0-RETAIL-DBW5 -m bootloader.xml
+repo init -u git://10.113.8.172/sw5100_bootloader/manifests.git -b SW5100.LW.1.0-RETAIL-DDW1
+repo init -u git://10.113.8.172/sw5100_bootloader/manifests.git -b SW5100.LW.2.0-MONACO-RETAIL
+
+# === Factory Code (sardine / sdm429w) ===
+repo init -u git://10.113.8.172/sardine/manifests.git -b lw301_00023_DBW2
+repo init -u git://10.113.8.172/sardine/manifests.git -b lw403c_00003
+repo init -u git://10.113.8.172/sdm429w/manifests.git -b sdm_lw10_00006 --depth=1
+git clone git://10.113.8.172/sardine/caf/kernel/msm-3.18 -b lw301_00023_DBW2
+git clone git://10.113.8.172/sardine/caf/kernel/lk -b lw301_00023_DBW2
+git clone git://10.113.8.172/sardine/non_android/modem -b lw301_00023_DBW2
+git clone git://10.113.8.172/sardine/device/compal/sardine -b lw301_00030
+# build/build_script/cei_env:
+git clone git://10.113.8.172/sardine/build
+git clone git://10.113.8.172/build_script
+git clone git://10.113.8.172/cei_env
+
+# === Retail Code (partner-android) ===
+repo init -u https://partner-android.googlesource.com/platform/vendor/pdk/triton/triton-userdebug/manifest -b o-mr1-wear-dev
+repo init -u https://partner-android.googlesource.com/platform/vendor/pdk/salmon/salmon-userdebug/manifest -b p-wear-dr-dev
+repo init -u https://partner-android.googlesource.com/platform/vendor/pdk/mola/mola-userdebug/manifest -b p-wear-hmr1-dev
+git clone https://partner-android.googlesource.com/kernel/private/msm-compal-cw -b android-msm-triton-3.18
+git clone https://partner-android.googlesource.com/kernel/private/msm-compal-cw-modules/wlan -b android-msm-common-4.9
+
+# === Fossil Code ===
+# pss.fossil.com
+repo init -u https://gerrit-asia.fossil.com/a/kernel/manifest -b p-dev-msm-triggerfish-4.9
+repo init -u ssh://alin@gerrit-asia.fossil.com:5222/kernel/manifest -b p-dev-msm-triggerfish-4.9
+repo init -u https://gerrit-asia.fossil.com/platform/vendor/pdk/gila/gila-userdebug/manifest -b p-wear-dr-dev
+git clone https://gerrit-asia.fossil.com/kernel/private/msm-fossil-extra-cw/config/ -b android-msm-fossil-4.9
+
+# === QCOM CAF ===
+repo init -u git://10.113.8.172/caf_oss_rel_3.0.1/manifests.git -m LW.BR.3.0.1-10100-8x09w.0.xml
+repo init -u git://10.113.8.172/caf_oss_rel_4.0.1/manifests.git -m LW.BR.4.0.1-00600-8x09w.0.xml
+git clone git://10.113.8.172/chipcode.git -b lw301_00023
+repo sync -c --no-tags --no-clone-bundle -j4
+
+# === Manifest / forall ===
+repo manifest -o xxx.xml -r
+repo manifest -r --suppress-upstream-revision -o name.xml
+repo forall -p -c "git log --oneline --author=compal"
+</script>
+
+<!-- ── Note 3: Build Commands ── -->
+<script type="text/plain" id="nc-3"># === Build System Image (soong) ===
+build/soong/soong_ui.bash --make-mode TARGET_PRODUCT=bluefish TARGET_BUILD_VARIANT=userdebug droid -j16
+
+# === Build Kernel — triton (arm-eabi-4.8) ===
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/ali/dailybuild/tools/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin
+make ARCH=arm CROSS_COMPILE=arm-eabi- triton_defconfig && make ARCH=arm CROSS_COMPILE=arm-eabi- -j4
+
+# === Build Kernel — salmon (arm-linux-androideabi-4.9) ===
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/ali/dailybuild/tools/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin
+make ARCH=arm CROSS_COMPILE=arm-linux-androidkernel- salmon_defconfig && make ARCH=arm CROSS_COMPILE=arm-linux-androidkernel- -j4
+
+# === Build Kernel — blowfish / sundial ===
+make -C msm-compal-cw O=../out ARCH=arm CROSS_COMPILE=arm-linux-androidkernel- sundial_defconfig
+make -C msm-compal-cw O=../out ARCH=arm CROSS_COMPILE=arm-linux-androidkernel- KCFLAGS=-mno-android -j16
+
+# === Build LK Bootloader ===
+make -C ./ \
+  TOOLCHAIN_PREFIX=/home/ali/dailybuild/tools/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi- \
+  BOOTLOADER_OUT=./out/target/product/msm8909w/obj/EMMC_BOOTLOADER_OBJ \
+  msm8909 EMMC_BOOT=1 SIGNED_KERNEL=1 VERIFIED_BOOT=1 DEFAULT_UNLOCK=true \
+  BOARD_NAME=triton ENABLE_VB_ATTEST=1 OSVERSION_IN_BOOTIMAGE=1 \
+  ENABLE_BG_SUPPORT=1 ENABLE_DISPLAY=1 TARGET_WEAR_SUPPORT_KM3=true
+
+# === Build BG Firmware ===
+build_bg_min_image.bat p9764_01-bg2asic-llvm-rel-uart
+build_bg_min_image.bat p9764_02-bg2asic-llvm-rel-uart
+
+# === Jack Server (older AOSP) ===
+export JACK_SERVER_VM_ARGUMENTS="-Dfile.encoding=UTF-8 -XX:+TieredCompilation -Xmx4g"
+./prebuilts/sdk/tools/jack-admin kill-server
+./prebuilts/sdk/tools/jack-admin start-server
+
+# === ccache setup ===
+export USE_CCACHE=1
+export CCACHE_DIR=/<path>/.ccache
+prebuilts/misc/linux-x86/ccache/ccache -M 50G
+# Monitor: watch -n1 -d prebuilts/misc/linux-x86/ccache/ccache -s
+
+# === Checkpatch / Lint ===
+./scripts/checkpatch.pl --ignore GERRIT_CHANGE_ID -g <commit_id>
+./../../msm-compal-cw/scripts/checkpatch.pl --ignore GERRIT_CHANGE_ID -g abb2819
+
+# === AOSP reference kernel (4.14) ===
+# https://android.googlesource.com/kernel/manifest/+/refs/heads/common-android-4.14-stable
+
+# === CTS ===
+repo init -u https://android.googlesource.com/platform/manifest -b oreo-cts-dev
+make cts -j4 TARGET_PRODUCT=aosp_arm64
+</script>
+
+<!-- ── Note 4: ADB Commands ── -->
+<script type="text/plain" id="nc-4"># === Basic ===
+adb root
+adb disable-verity
+adb remount
+adb reboot
+
+# === DM Verity — push modem images ===
+adb wait-for-device root
+adb wait-for-device remount
+adb shell mount -o remount,rw /firmware   # or: mount -o rw,remount /firmware
+adb shell rm /firmware/image/modem*
+adb shell rm /firmware/image/mba*
+adb push <split_images_path> /firmware/image
+adb shell sync
+adb reboot
+# Note: /firmware --> /vendor/firmware_mnt (newer builds)
+
+# === Sensors — disable/enable ===
+adb root && adb disable-verity && adb reboot
+adb root && adb remount
+adb shell "echo disable_sensors > /mnt/vendor/persist/sensors/sensors_settings"
+adb shell sync && adb reboot
+# Re-enable:
+adb shell "echo enable_sensors > /mnt/vendor/persist/sensors/sensors_settings"
+
+# === Touch Debug ===
+adb shell settings put system show_touches 1       # show touch dot
+adb shell settings put system show_touches 0       # hide
+adb shell settings put system pointer_location 1   # show touch trail
+adb shell settings put system pointer_location 0
+
+# === Screen Brightness ===
+adb shell "echo 200 > sys/class/leds/lcd-backlight/brightness"
+
+# === Vibrator ===
+adb shell "echo 10000 > /sys/devices/virtual/timed_output/vibrator/enable"
+
+# === Battery / Power ===
+adb shell dumpsys batterystats > dumpsys_batterystats.txt
+dumpsys batterystats --enable full-wake-history
+dumpsys battery unplug
+dumpsys deviceidle step
+# 250mA charging test:
+adb root
+echo 2 > sys/class/power_supply/battery/voltage_max_design
+echo 73 > sys/class/power_supply/battery/voltage_min_design
+
+# === Performance ===
+adb shell "dumpsys gfxinfo com.google.android.wearable.app | grep Janky"
+adb shell "dumpsys gfxinfo com.google.android.apps.wearable.settings | grep Janky"
+
+# === SEPolicy ===
+adb shell dmesg | grep denied | audit2allow -p out/target/product/sole/recovery/root/sepolicy
+
+# === Skip OOBE ===
+adb shell am broadcast -a com.google.android.clockwork.action.TEST_MODE
+adb shell am broadcast -a android.intent.action.MASTER_CLEAR
+
+# === Boot to OS (from T2/factory) ===
+adb root
+adb shell "echo --wipe_data_to_os > /cache/recovery/command"
+adb reboot recovery
+# If already normal OS and no userdata wipe: adb reboot cei_normal_os
+
+# === ADB over Bluetooth ===
+adb forward tcp:4444 localabstract:/adb-hub
+adb connect localhost:4444
+adb -e shell dmesg > aaa.txt
+
+# === BG Firmware Update ===
+adb root && adb wait-for-device
+adb shell umount /firmware
+adb shell mount -t vfat -o rw /dev/block/bootdevice/by-name/modem /firmware
+adb shell rm -rf /firmware/image/bg-wear*
+adb push bg-wear.mdt /firmware/image/bg-wear.mdt
+adb push bg-wear.b00 /firmware/image/bg-wear.b00
+adb push bg-wear.b01 /firmware/image/bg-wear.b01
+adb push bg-wear.b02 /firmware/image/bg-wear.b02
+adb shell sync && adb reboot
+
+# === Slate / BG subsystem ===
+adb shell cat /sys/bus/msm_subsys/devices/subsys0/name
+adb shell cat /sys/bus/msm_subsys/devices/subsys0/state
+# subsys0=slatefw  subsys1=adsp  subsys2=modem
+
+# === eMMC Info ===
+cat /sys/class/block/mmcblk0/device/cid
+cat /sys/class/block/mmcblk0/device/serial
+cat /sys/class/block/mmcblk0/device/manfid
+
+# === Logs ===
+cat /proc/kmsg > /data/dmesg.log &
+
+# === qbi_log enable (UART / MBIM) ===
+# Set enable flag with 8MB size:  printf '\x80\x84\x1E\x00' > /data/mbimd/qbi_enable_logging
+
+# === UART input (when adb not ready) ===
+input keyevent 224
+input swipe 100 350 100 0
+input tap 175 130
+</script>
+
+<!-- ── Note 5: Git Skills ── -->
+<script type="text/plain" id="nc-5"># === Format Patch ===
+git format-patch -$(git rev-list --count HEAD) --relative .
+git format-patch cc6662b01f8e07b053..HEAD --stdout > aa
+
+# === Push to Gerrit with reviewers ===
+git push origin HEAD:refs/for/android-msm-sundial-3.18%r=julius_yen@compal.com,r=Tilly_Shu@compal.com
+git push --no-thin ssh://ali_lin@10.113.8.172:29418/sardine/caf/kernel/msm-3.18.git HEAD:refs/for/lw301_00022_DBW2
+
+# === Push with old KEX algorithm ===
+GIT_SSH_COMMAND='ssh -oKexAlgorithms=+diffie-hellman-group1-sha1' \
+  git push ssh://ali_lin@10.113.8.187:29418/sdx12-le-1-0_amss_standard_ceioem \
+  HEAD:refs/for/sdx12-release-LE1.0_DELL
+
+# === Stash ===
+git stash
+git stash list
+git stash apply
+
+# === Cherry-pick diff between branches ===
+git cherry -v remote/lw40_00010 bluegill_lw30 remote/lw30_00010
+
+# === Merge specific file from another branch ===
+git checkout <another-branch> <path-to-file>
+git status
+git commit -m "'Merge' specific file from '<another-branch>'"
+
+# === Merge CAF kernel workflow ===
+cd kernel
+git remote add caf_kernel -t lw301_00023 git://10.113.8.172/caf_oss_rel_3.0.1/kernel/msm-3.18
+git fetch caf_kernel
+git checkout -b caf_kernel remotes/caf_kernel/lw301_00023
+git checkout -b lw301_00022 remotes/origin/lw301_00022
+git merge caf_kernel
+# Resolve conflicts, then:
+git add drivers/input/touchscreen/Makefile
+git commit
+
+# === Bundle (offline transfer) ===
+git bundle create salmon_kernel.bundle remotes/origin/android-msm-salmon-4.9..android-msm-salmon-4.9
+git pull commits.bundle android-msm-triton-3.18
+
+# === Amend author ===
+git commit --amend --reset-author --no-edit
+
+# === Diff between two remote branches (specific file) ===
+git diff remotes/origin/lw301_00030_ESW1..remotes/origin/lw301_00030_DLW2 -- cert.xml
+
+# === repo forall push ===
+repo forall -c "git push compal-private HEAD:refs/heads/compal-pi-wear-hmr2-release"
+repo forall -c "git push compal-private --delete refs/heads/compal-pi-wear-hmr2-release"
+
+# === Useful find / sed ===
+find -name '*.mk' -exec grep -H salmon {} --color \;
+find -name 'Android.bp' -exec rename "s/Android.bp/Androidbp/" {} \;
+find *.c | xargs -i sed -i 's/test/good/g' {}
+grep -rl test . | xargs -i sed -i 's/test/good/g' {}
+# Rename files:
+rename "s/AA/aa/" *
+# vim global replace:  :1,$s/123/456/g
+
+# === Background job ===
+nohup ./logcat.sh &
+
+# === Boot count timer ===
+adb reboot; time $(adb wait-for-device); time $(CMPL=0; while [ "$CMPL" != "1" ]; do CMPL=$(adb shell getprop sys.boot_completed); sleep 0.01; done)
+</script>
+
+<!-- ── Note 6: Kernel Debug ── -->
+<script type="text/plain" id="nc-6"># === GPIO ===
+cat /sys/kernel/debug/gpio
+
+# === PMIC / Regulator ===
+cat /sys/kernel/debug/regulator/8916_l15/consumers
+cat /sys/devices/system/cpu/online
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
+cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq
+
+# === Write PMIC Register (regmap spmi) ===
+cd /sys/kernel/debug/regmap/spmi0-00
+echo 0x00870 > address
+cat data
+echo 0x?? > data
+
+# === ramdump: config power key to warm reset ===
+# Step1: check default
+cd /d/regmap/spmi0-00
+echo 0x842 > address && echo 2 > count && cat data
+# Step2: set warm reset
+echo 0x842 > address && echo 1 > count && echo 0x1 > data && cat data
+# (kernel config needed: CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS=Y)
+
+# === Suspend Debug ===
+echo 8 > /proc/sys/kernel/printk
+echo 1 > /sys/module/mpm_of/parameters/debug_mask
+echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
+echo 1 > /d/clk/debug_suspend
+
+# === Wake Lock ===
+adb shell
+echo test > /sys/power/wake_lock
+echo test > /sys/power/wake_unlock
+
+# === Doze ===
+dumpsys batterystats --enable full-wake-history
+dumpsys battery unplug
+dumpsys deviceidle step
+
+# === Force Kernel Panic (ramdump) ===
+echo 'c' > /proc/sysrq-trigger
+# Upload to: https://cap.qti.qualcomm.com/
+# QPST -> Help -> Open Log File Directory -> Sahara
+
+# === IRQ Table ===
+cat /proc/interrupts
+
+# === Window ANR ===
+dumpsys window lastanr
+
+# === Kernel version from vmlinux ===
+strings vmlinux | grep -i "Linux version"
+
+# === qspy (BG background processor logging) ===
+adb root
+adb shell setprop persist.vendor.bg.qspy_logging 1
+adb reboot
+# On Windows: qspy.exe -c COM39 -b3000000 -o
+
+# === Backup persist partition ===
+adb shell dd if=/dev/block/mmcblk0p24 of=/data/persistbackup.img
+adb pull /data/persistbackup.img
+
+# === Ghost — full eMMC backup/restore via 9008 mode ===
+# Backup:
+emmcdl.exe -p COM1 -f prog_emmc_firehose_8909w_ddr.mbn -d DISK -o full.bin
+emmcdl.exe -p COM5 -f prog_emmc_firehose_8937_ddr.mbn -d DISK -o full.bin
+# Restore:
+emmcdl.exe -p COM1 -f prog_emmc_firehose_8909w_ddr.mbn -b DISK full.bin
+# Ramdump via fh_loader:
+QSaharaServer.exe -p \\.\COM5 -s 13:D:\ali_img\9008\5100-ramdump\prog_firehose_ddr.elf
+fh_loader.exe --port=\\.\COM5 --sendxml=rawprogram0_ddw1_backup.xml --search_path=D:\dump\ --noprompt --memoryname=eMMC
+
+# === OEM partition (make_ext4fs) ===
+dd if=/dev/zero of=data/oem.img count=1 bs=8MB
+mkfs -t ext4 oem.img
+make_ext4fs -s -S out/target/product/blowfish/system/etc/selinux/plat_file_contexts -l 16M -a oem s.img oemimg/
+simg2img s.img oem.img
+sudo mount -o loop oem.img /mnt/oem
+sudo umount /mnt/oem
+
+# === Verified Boot — generate oem_keystore.h ===
+# 0. Receive "verifiedboot_pub.pem" from Google
+# 1. openssl pkey -outform der -inform PEM -in verifiedboot_pub.pem -out verifiedboot_pub.der -pubin
+# 2. pushd system/extras/verity/ ; mm ; popd
+# 3. sudo java -Xmx512M -jar out/host/linux-x86/framework/BootKeystoreSigner.jar \
+#      build/target/product/security/verity.pk8 \
+#      build/target/product/security/verity.x509.pem \
+#      keystore.img verifiedboot_pub.der
+# 4. generate_oem_keystore_h KEYSTORE_IMG > oem_keystore.h
+
+# === Sepolicy ===
+adb shell dmesg | grep denied | audit2allow -p out/target/product/sole/recovery/root/sepolicy
+BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
+
+# === i2c ===
+ls /sys/bus/i2c/devices
+ls /sys/bus/i2c/drivers
+
+# === Vibrator (DTS) ===
+# vim msm8909-lionfish-pm8916-mtp.dtsi
+# vim 8909w-pm660.dtsi  (haptics section)
+adb shell "echo 10000 > /sys/devices/virtual/timed_output/vibrator/enable"
+
+# === QCOM Diag USB composition ===
+# persist.sys.usb.config=diag,serial_smd,rmnet_qti_bam,adb
+# ro.sys.usb.default.config=diag,serial_smd,rmnet_qti_bam,adb
+</script>
+
+<!-- ── Note 7: Windows / PC Tools ── -->
+<script type="text/plain" id="nc-7"># === Windows Route ===
+route print
+route delete 0.0.0.0
+route add 0.0.0.0 mask 0.0.0.0 <external_gateway>
+route add 172.18.0.0 mask 255.255.0.0 <internal_gateway>
+route add 192.168.0.0 mask 255.255.0.0 <internal_gateway>
+route change 0.0.0.0 mask 0.0.0.0 10.113.61.254 metric 30
+route add 10.0.0.0 mask 255.0.0.0 10.113.61.254
+
+# === WWAN ETL Logging ===
+logman start WWANLog -p "Microsoft-Windows-WWAN-SVC-EVENTS" -o WWAN.etl -ets
+logman stop WWANLog -ets
+tracerpt WWAN.etl -o output.log -of CSV
+# Netsh WWAN:
+netsh mbn show radio interface=Cellular
+netsh mbn show interfaces
+
+# === DebugView (KD output) ===
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\GlobalFlag" /v GlobalFlag /t REG_DWORD /d 0x02000000 /f
+
+# === Wireshark — convert ETL ===
+netsh trace convert .\netracelog.etl .\netracelog.txt
+Get-Content netracelog.txt | Where-Object {$_ -notmatch "No Format Information found"} | Set-Content netracelog_clean.txt
+# Wireshark filter: --p=Microsoft-Windows-Wmbclass-Opn
+
+# === CodeQL — create database ===
+codeql database create --overwrite -l=cpp ^
+  -s=F:\_support\QUD\QMI_ori_build\win\qcwwan\wdfserial_905_ie66 ^
+  -c "MSBuild /t:rebuild qcwdfserial.sln /p:configuration=Release /p:platform=x64 /p:UseSharedCompilation=false" ^
+  "F:\_support\...\codeql" -j 0
+
+# === CodeQL — analyze ===
+codeql database analyze <db_dir> <codeql\cpp-queries\mustfix.qls> ^
+  --format=sarifv2.1.0 --output="<output.sarif>"
+
+# === DVL (Driver Verification Log) ===
+"C:\Program Files (x86)\Windows Kits\10\Tools\dvl\dvl.exe" /manualCreate wdfserial x64
+
+# === fastboot device lock/unlock ===
+fastboot oem device-info
+# Unlock:
+fastboot flash devinfo dev.bin
+fastboot reboot-bootloader
+fastboot oem unlock-go
+fastboot flashing unlock_critical
+
+# === Copy files with directory structure ===
+find test/ -name '*.txt' | xargs tar czf test3.tgz
+tar zxvf test3.tgz -C test3
+
+# === Clean memory ===
+sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
+# === Python alternatives (Ubuntu) ===
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.4 2
+sudo update-alternatives --config python
+
+# === OpenSSL 1.0.2 install ===
+wget https://www.openssl.org/source/openssl-1.0.2l.tar.gz
+tar -xzvf openssl-1.0.2l.tar.gz && cd openssl-1.0.2l
+sudo ./config && sudo make install
+cd /usr/bin && mv openssl openssl.1.1.bak
+sudo ln -sf /usr/local/ssl/bin/openssl openssl
+openssl version -v
+
+# === VMware shared folder (fstab fix) ===
+# vmhgfs-fuse   /mnt/hgfs    fuse    defaults,allow_other    0    0
+
+# === SCP ===
+scp 0001-factory-patch.patch rdadmin@10.113.8.91:/home/rdadmin/dailybuild
+
+# === Systrace ===
+# C:\Users\ali_lin\AppData\Local\Android\sdk\tools\lib\monitor-x86_64
+</script>
+
+<!-- ── Note 8: Gerrit Commands ── -->
+<script type="text/plain" id="nc-8"># === Gerrit SSH — review / submit ===
+ssh -p 29418 julius_yen@10.113.8.172 gerrit review --verified +1 7752,1
+ssh -p 29418 julius_yen@10.113.8.172 gerrit review --code-review +2 7752,1
+ssh -p 29418 julius_yen@10.113.8.172 gerrit review --submit 7752,1
+# Abandon change & run GC:
+ssh -p 29418 julius_yen@10.113.8.172 gerrit gc sardine/non_android/modem
+
+# === Flush caches ===
+ssh -p 29418 julius_yen@10.113.8.172 gerrit flush-caches --all
+ssh -p 29418 julius_yen@10.113.8.172 gerrit flush-caches
+
+# === Create project ===
+ssh -p 29418 julius_yen@10.113.8.172 gerrit create-project ali.git
+
+# === Restart Gerrit server ===
+sudo /home/gerrit/review_site/bin/gerrit.sh restart
+/home/gerrit/review_site/bin/gerrit.sh stop
+java -jar gerrit-3.6.1.war reindex -d /home/gerrit/review_site/
+/home/gerrit/review_site/bin/gerrit.sh start
+
+# === Factory Gerrit push (10.113.8.172:29418) ===
+git push ssh://ali_lin@10.113.8.172:29418/sardine/caf/kernel/msm-3.18.git HEAD:refs/for/lw301_00023_DBW2
+git push ssh://ali_lin@10.113.8.172:29418/sardine/caf/kernel/lk.git HEAD:refs/for/lw301_00023_DBW2
+git push ssh://ali_lin@10.113.8.172:29418/sardine/non_android/modem.git HEAD:refs/for/lw301_00023_DBW2
+git push ssh://ali_lin@10.113.8.172:29418/sardine/device/compal/sardine.git HEAD:refs/for/lw301_00022
+
+# === Push new branch to factory git server ===
+git push ssh://ali_lin@10.113.8.172/var/git_repo/sardine/caf/kernel/msm-4.9 HEAD:refs/heads/new_branch
+git push ssh://ali_lin@10.113.8.172/var/git_repo/sardine/manifests HEAD:refs/heads/new_branch
+git push ssh://ali_lin@10.113.8.172/var/git_repo/sardine/device/compal/audio-kernel HEAD:refs/heads/new_branch
+
+# === Dyson private kernel push ===
+git push --push-option=skip-validation --push-option=nokeycheck -f \
+  https://dyson-private.googlesource.com/kernel/private/msm-dyson-cw \
+  HEAD:refs/heads/dyson-compal-tm-wear-kr3-blowfish
+
+# === SDX12 push (old KEX algorithm) ===
+GIT_SSH_COMMAND='ssh -oKexAlgorithms=+diffie-hellman-group1-sha1' \
+  git push ssh://ali_lin@10.113.8.187:29418/sdx12-le-1-0_amss_standard_ceioem \
+  HEAD:refs/for/sdx12-release-LE1.0_DELL
+
+GIT_SSH_COMMAND='ssh -oKexAlgorithms=+diffie-hellman-group1-sha1' \
+  git push ssh://ali_lin@10.113.8.187:29418/platform/vendor/cei \
+  HEAD:refs/for/sdx12-release-LE1.0_X15_ACan
+
+# === repo forall push ===
+repo forall -c "git push compal-private HEAD:refs/heads/compal-pi-wear-hmr2-release"
+repo forall -c "git push compal-private --delete refs/heads/compal-pi-wear-hmr2-release"
+repo forall -c "git checkout sdx12-release-LE1.0_DELL_07.54_LisaSIM_Log_TB"
+repo forall -c "git reset --hard origin/sdx12-release-LE1.0_DELL_07.54_LisaSIM_Log_TB"
+repo forall -c "git clean -fd"
+
+# === Jenkins ===
+# http://10.113.8.92:8080/
+# ali_lin  18693
+
+# === Code Review URLs ===
+# Retail:  https://partner-android-review.googlesource.com/dashboard/self
+# Factory: http://10.113.8.172:8081/#/q/status:open,n,z
+# QCT:     https://createpoint.qti.qualcomm.com/dashboard/public/productkit
+</script>
+
+
+<!-- ── Dependencies ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+<!-- ── App modules ── -->
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
