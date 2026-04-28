@@ -1637,6 +1637,284 @@ typedef struct {
 | UNIX domain socket    | 雙向：接收客戶端 AT 請求 + 回傳 response |
 </script>
 
+<script type="text/plain" id="nc-15">
+# Vim 速查手冊
+
+## 模式 (Modes)
+
+| 模式 | 進入方式 | 說明 |
+|------|----------|------|
+| Normal | `<Esc>` / `<C-[>` | 預設模式，導航與操作 |
+| Insert | `i` `a` `o` `I` `A` `O` | 輸入文字 |
+| Visual | `v` (字元) / `V` (行) / `<C-v>` (區塊) | 選取文字 |
+| Command | `:` | Ex 命令列 |
+| Replace | `R` | 覆蓋輸入 |
+
+---
+
+## 移動 (Motion)
+
+### 基本
+| 鍵 | 動作 |
+|----|------|
+| `h` `j` `k` `l` | 左 / 下 / 上 / 右 |
+| `w` `W` | 跳到下一個 word/WORD 開頭 |
+| `b` `B` | 跳到上一個 word/WORD 開頭 |
+| `e` `E` | 跳到 word/WORD 結尾 |
+| `0` | 行首（含空白） |
+| `^` | 行首（第一個非空白字元） |
+| `$` | 行尾 |
+| `gg` | 檔案第一行 |
+| `G` | 檔案最後一行 |
+| `{n}G` 或 `:{n}` | 跳到第 n 行 |
+
+### 螢幕滾動
+| 鍵 | 動作 |
+|----|------|
+| `<C-f>` / `<C-b>` | 向下 / 向上整頁 |
+| `<C-d>` / `<C-u>` | 向下 / 向上半頁 |
+| `zz` | 游標行置中 |
+| `zt` / `zb` | 游標行移至頂部 / 底部 |
+
+### 跳躍
+| 鍵 | 動作 |
+|----|------|
+| `f{c}` / `F{c}` | 跳到同行下 / 上一個字元 c |
+| `t{c}` / `T{c}` | 跳到 c 之前 / 之後 |
+| `;` / `,` | 重複 / 反向 f/t |
+| `%` | 跳到配對括號 `()` `[]` `{}` |
+| `*` / `#` | 搜尋游標所在 word（下 / 上） |
+| `<C-o>` / `<C-i>` | 跳回 / 跳前（jump list） |
+| `''` 或 ` `` ` | 跳回上一個位置 |
+
+---
+
+## 編輯 (Edit)
+
+### 進入 Insert 模式
+| 鍵 | 動作 |
+|----|------|
+| `i` / `I` | 游標前 / 行首插入 |
+| `a` / `A` | 游標後 / 行尾插入 |
+| `o` / `O` | 下方 / 上方新增一行 |
+| `s` / `S` | 刪除字元後插入 / 刪除整行後插入 |
+| `c{motion}` | 刪除 motion 範圍後插入（change） |
+| `C` | 刪除至行尾後插入 |
+
+### 刪除
+| 鍵 | 動作 |
+|----|------|
+| `x` / `X` | 刪除游標處 / 前一個字元 |
+| `d{motion}` | 刪除 motion 範圍 |
+| `dd` | 刪除整行 |
+| `D` | 刪除至行尾 |
+| `daw` / `diw` | 刪除一個 word（含/不含空白） |
+
+### 複製與貼上
+| 鍵 | 動作 |
+|----|------|
+| `y{motion}` | 複製 motion 範圍 |
+| `yy` 或 `Y` | 複製整行 |
+| `p` / `P` | 貼到游標後 / 前 |
+| `yiw` / `yaw` | 複製 word（不含/含空白） |
+
+### Undo / Redo
+| 鍵 | 動作 |
+|----|------|
+| `u` | Undo |
+| `<C-r>` | Redo |
+| `U` | 還原整行所有變更 |
+
+### 重複
+| 鍵 | 動作 |
+|----|------|
+| `.` | 重複上一次修改 |
+| `{n}{cmd}` | 重複命令 n 次（如 `5dd` 刪 5 行） |
+
+---
+
+## 文字物件 (Text Object)
+
+用法：`{operator}{a|i}{object}`
+
+| 物件 | 說明 |
+|------|------|
+| `w` | word |
+| `s` | sentence |
+| `p` | paragraph |
+| `"` `'` `` ` `` | 引號內容 |
+| `(` `)` `b` | 小括號 |
+| `{` `}` `B` | 大括號 |
+| `[` `]` | 中括號 |
+| `<` `>` | 角括號 |
+| `t` | HTML/XML tag |
+
+範例：`ci"` 更改引號內容、`da{` 刪除大括號含括號
+
+---
+
+## 搜尋與取代 (Search & Replace)
+
+```
+/pattern        向下搜尋
+?pattern        向上搜尋
+n / N           下一個 / 上一個結果
+:noh            清除搜尋高亮
+
+:%s/old/new/g   全檔取代
+:%s/old/new/gc  全檔取代（逐一確認）
+:5,10s/old/new  第 5~10 行取代
+```
+
+**常用 flags：** `g`（全行）、`i`（忽略大小寫）、`c`（確認）、`e`（不報錯）
+
+---
+
+## 暫存器 (Register)
+
+| 暫存器 | 說明 |
+|--------|------|
+| `"` | 預設（unnamed） |
+| `0` | 最後一次 yank |
+| `1`–`9` | 最近刪除記錄 |
+| `a`–`z` | 命名暫存器 |
+| `+` | 系統剪貼簿 |
+| `*` | Primary selection（Linux） |
+| `%` | 目前檔名 |
+| `/` | 最後搜尋 pattern |
+| `:` | 最後 Ex 命令 |
+
+使用：`"ayy` 複製到 a、`"ap` 從 a 貼上
+Insert 模式插入暫存器內容：`<C-r>{reg}`
+
+---
+
+## 巨集 (Macro)
+
+```
+qa      開始錄製到暫存器 a
+q       停止錄製
+@a      執行 a 巨集
+@@      重複上一個巨集
+10@a    執行 10 次
+```
+
+---
+
+## 標記 (Mark)
+
+```
+m{a-z}    設定本地標記
+m{A-Z}    設定全域標記（跨檔案）
+'{mark}   跳到標記所在行
+`{mark}   跳到標記精確位置
+:marks    列出所有標記
+```
+
+---
+
+## 分割視窗 / Tab (Window & Tab)
+
+### 分割
+```
+:sp  / :vsp          水平 / 垂直分割
+<C-w>s / <C-w>v      同上
+<C-w>h/j/k/l         切換分割視窗
+<C-w>H/J/K/L         移動視窗位置
+<C-w>=               平均分配大小
+<C-w>_               最大化高度
+<C-w>|               最大化寬度
+:close / <C-w>c      關閉目前視窗
+```
+
+### Tab
+```
+:tabnew [file]    新增 tab
+:tabn / :tabp     下一個 / 上一個 tab
+gt / gT           同上
+{n}gt             跳到第 n 個 tab
+:tabclose         關閉目前 tab
+```
+
+---
+
+## 檔案與 Buffer
+
+```
+:e {file}         開啟檔案
+:w                存檔
+:w {file}         另存新檔
+:q / :q! / :wq    離開 / 強制離開 / 存後離開
+:x / ZZ           存後離開（同 :wq）
+:ls               列出所有 buffer
+:b{n}             切換到第 n 個 buffer
+:bn / :bp         下一個 / 上一個 buffer
+:bd               關閉（刪除）buffer
+```
+
+---
+
+## 實用技巧
+
+### 縮排
+```
+>>  / <<          向右 / 向左縮排（Normal 模式）
+>%  / <%          縮排到配對括號
+=   / ==          自動縮排 / 整行自動縮排
+gg=G              整檔自動縮排
+```
+
+### 摺疊 (Fold)
+```
+zf{motion}   建立摺疊
+zo / zc      展開 / 收合
+zO / zC      遞迴展開 / 收合
+za           切換
+zR / zM      展開全部 / 收合全部
+```
+
+### 外部命令
+```
+:!{cmd}          執行 shell 命令
+:r !{cmd}        將命令輸出插入檔案
+:{range}!{cmd}   用命令過濾選取範圍（如 :%!sort）
+```
+
+### 多行編輯（Visual Block）
+1. `<C-v>` 進入區塊選取
+2. 選取目標行
+3. `I` 插入，輸入文字，`<Esc>` 套用到所有行
+
+### 替換技巧
+```
+:%s/\s\+$//e     刪除行尾空白
+:%s/\t/  /g      Tab 換成空格
+:g/pattern/d     刪除所有符合 pattern 的行
+:v/pattern/d     刪除所有不符合 pattern 的行
+```
+
+---
+
+## 常用 .vimrc 設定
+
+```vim
+set number          " 顯示行號
+set relativenumber  " 相對行號
+set expandtab       " Tab 轉空格
+set tabstop=4       " Tab 寬度
+set shiftwidth=4    " 縮排寬度
+set smartindent     " 智慧縮排
+set hlsearch        " 高亮搜尋
+set incsearch       " 即時搜尋
+set ignorecase      " 搜尋忽略大小寫
+set smartcase       " 有大寫則不忽略
+set clipboard=unnamedplus  " 使用系統剪貼簿
+set cursorline      " 高亮游標行
+set scrolloff=5     " 捲動時保留 5 行緩衝
+set wildmenu        " 命令補全選單
+```
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

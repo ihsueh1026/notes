@@ -124,5 +124,14 @@ var NOTES_META = [
     date: '2026-04-28',
     lang: 'markdown',
     description: 'AT Forwarding Daemon 架構 — QMI ATCOP 註冊、AT 命令分發、UNIX socket 客戶端通訊、82 條命令清單'
+  },
+  {
+    id: 15,
+    title: 'Vim 速查手冊',
+    category: 'Docs',
+    tags: ['vim', 'editor', 'keybindings', 'navigation', 'macro', 'register', 'split', 'search'],
+    date: '2026-04-29',
+    lang: 'markdown',
+    description: 'Vim 常用快捷鍵速查 — 模式切換、移動、編輯、搜尋取代、暫存器、巨集、分割視窗、實用技巧'
   }
 ];
