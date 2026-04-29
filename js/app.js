@@ -315,7 +315,8 @@ var App = (function () {
 
     var modified = NoteStorage.getModifiedIds();
     var deleted  = NoteStorage.getDeletedIds();
-    if (!modified.length && !deleted.length) { alert('沒有已修改或刪除的筆記'); return; }
+    var savedOrder = localStorage.getItem('ali_order');
+    if (!modified.length && !deleted.length && !savedOrder) { alert('沒有已修改、刪除或重新排序的筆記'); return; }
 
     var btn = document.getElementById('pushBtn');
     if (btn) { btn.disabled = true; btn.textContent = '推送中…'; }
@@ -350,6 +351,7 @@ var App = (function () {
     var parts = [];
     if (modified.length) parts.push('Update ' + modified.length + ' note(s)');
     if (deleted.length)  parts.push('Delete ' + deleted.length + ' note(s)');
+    if (savedOrder)      parts.push('Reorder notes');
     var commitMsg = parts.join(', ') + ' via browser';
 
     /* Step 1: update index.html (content edits + remove deleted blocks) */
@@ -375,9 +377,8 @@ var App = (function () {
 
         return ghPut('index.html', file.sha, html, commitMsg);
       })
-      /* Step 2: update data.js (remove deleted entries from NOTES_META) */
+      /* Step 2: always update data.js (order + deletions) */
       .then(function () {
-        if (!deleted.length) return;
         return ghGet('js/data.js').then(function (file) {
           var js = 'var NOTES_META = [\n';
           state.notes.forEach(function (n, i) {
@@ -399,10 +400,12 @@ var App = (function () {
       .then(function () {
         modified.forEach(function (id) { NoteStorage.reset(id); });
         if (deleted.length) NoteStorage.clearDeleted();
+        if (savedOrder) localStorage.removeItem('ali_order');
 
         var msg = [];
         if (modified.length) msg.push(modified.length + ' 個筆記已更新');
         if (deleted.length)  msg.push(deleted.length  + ' 個筆記已永久刪除');
+        if (savedOrder)      msg.push('排序已同步');
         alert('推送成功！' + msg.join('，') + '\n\n請在 WSL 終端機執行：\ncd /mnt/d/notes && git pull');
 
         if (state.active) openNote(state.active);
