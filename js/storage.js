@@ -4,8 +4,9 @@
  *        ali_modified   → JSON array of modified note IDs
  */
 var NoteStorage = (function () {
-  var PREFIX = 'ali_n_';
+  var PREFIX  = 'ali_n_';
   var MOD_KEY = 'ali_modified';
+  var DEL_KEY = 'ali_deleted';
 
   function getMod() {
     try { return JSON.parse(localStorage.getItem(MOD_KEY) || '[]'); }
@@ -72,6 +73,21 @@ var NoteStorage = (function () {
         }
       });
       return count;
+    },
+
+    getDeletedIds: function () {
+      try { return JSON.parse(localStorage.getItem(DEL_KEY) || '[]'); }
+      catch (e) { return []; }
+    },
+
+    markDeleted: function (id) {
+      var ids = this.getDeletedIds();
+      if (ids.indexOf(id) < 0) ids.push(id);
+      localStorage.setItem(DEL_KEY, JSON.stringify(ids));
+    },
+
+    clearDeleted: function () {
+      localStorage.removeItem(DEL_KEY);
     }
   };
 })();

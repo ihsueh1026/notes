@@ -106,12 +106,36 @@ var App = (function () {
     /* Push to GitHub */
     document.getElementById('pushBtn').addEventListener('click', pushToGitHub);
 
+    /* Delete button */
+    document.getElementById('deleteBtn').addEventListener('click', function () {
+      deleteNote(note);
+    });
+
     /* Edit button */
     document.getElementById('editBtn').addEventListener('click', function () {
       editNote(note);
     });
 
     renderSidebar();
+  }
+
+  /* ── Delete note ── */
+  function deleteNote(note) {
+    if (!confirm('確定要刪除「' + note.title + '」？\n\n筆記將立即從介面移除，推送後從原始檔案永久刪除。')) return;
+    NoteStorage.markDeleted(note.id);
+    NoteStorage.reset(note.id);
+
+    var idx = -1;
+    state.notes.forEach(function (n, i) { if (n.id === note.id) idx = i; });
+    if (idx >= 0) state.notes.splice(idx, 1);
+
+    state.active = null;
+    if (state.notes.length) {
+      openNote(state.notes[Math.min(idx, state.notes.length - 1)]);
+    } else {
+      document.getElementById('mainContent').innerHTML = UI.renderEmpty();
+      renderSidebar();
+    }
   }
 
   /* ── Edit mode ── */
@@ -224,25 +248,49 @@ var App = (function () {
     }
 
     var modified = NoteStorage.getModifiedIds();
-    if (!modified.length) { alert('沒有已修改的筆記'); return; }
+    var deleted  = NoteStorage.getDeletedIds();
+    if (!modified.length && !deleted.length) { alert('沒有已修改或刪除的筆記'); return; }
 
     var btn = document.getElementById('pushBtn');
     if (btn) { btn.disabled = true; btn.textContent = '推送中…'; }
 
-    var api = 'https://api.github.com/repos/ihsueh1026/notes/contents/index.html';
+    var REPO    = 'https://api.github.com/repos/ihsueh1026/notes/contents/';
     var headers = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' };
 
-    fetch(api, { headers: headers })
-      .then(function (r) { return r.json(); })
-      .then(function (file) {
-        var sha = file.sha;
-        /* Decode base64 → UTF-8 string */
-        var raw = atob(file.content.replace(/\n/g, ''));
-        var bytes = new Uint8Array(raw.length);
-        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-        var html = new TextDecoder('utf-8').decode(bytes);
+    function ghGet(path) {
+      return fetch(REPO + path, { headers: headers }).then(function (r) { return r.json(); });
+    }
 
-        /* Replace each modified nc-{id} block */
+    function ghPut(path, sha, content, msg) {
+      var encoded = new TextEncoder().encode(content);
+      var bin = '';
+      encoded.forEach(function (b) { bin += String.fromCharCode(b); });
+      return fetch(REPO + path, {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+        body: JSON.stringify({ message: msg, content: btoa(bin), sha: sha })
+      }).then(function (r) {
+        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || r.status); });
+      });
+    }
+
+    function b64decode(str) {
+      var raw = atob(str.replace(/\n/g, ''));
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    var parts = [];
+    if (modified.length) parts.push('Update ' + modified.length + ' note(s)');
+    if (deleted.length)  parts.push('Delete ' + deleted.length + ' note(s)');
+    var commitMsg = parts.join(', ') + ' via browser';
+
+    /* Step 1: update index.html (content edits + remove deleted blocks) */
+    ghGet('index.html')
+      .then(function (file) {
+        var html = b64decode(file.content);
+
         modified.forEach(function (id) {
           var saved = NoteStorage.load(id);
           if (saved === null) return;
@@ -252,30 +300,47 @@ var App = (function () {
           );
         });
 
-        /* Encode UTF-8 string → base64 */
-        var encoded = new TextEncoder().encode(html);
-        var bin = '';
-        encoded.forEach(function (b) { bin += String.fromCharCode(b); });
+        deleted.forEach(function (id) {
+          html = html.replace(
+            new RegExp('\\n?<script type="text\\/plain" id="nc-' + id + '">[\\s\\S]*?<\\/script>\\n?'),
+            '\n'
+          );
+        });
 
-        return fetch(api, {
-          method: 'PUT',
-          headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
-          body: JSON.stringify({
-            message: 'Update ' + modified.length + ' note(s) via browser',
-            content: btoa(bin),
-            sha: sha
-          })
+        return ghPut('index.html', file.sha, html, commitMsg);
+      })
+      /* Step 2: update data.js (remove deleted entries from NOTES_META) */
+      .then(function () {
+        if (!deleted.length) return;
+        return ghGet('js/data.js').then(function (file) {
+          var js = 'var NOTES_META = [\n';
+          state.notes.forEach(function (n, i) {
+            js += '  {\n'
+              + '    id: '          + n.id                         + ',\n'
+              + '    title: '       + JSON.stringify(n.title)       + ',\n'
+              + '    category: '    + JSON.stringify(n.category)    + ',\n'
+              + '    tags: '        + JSON.stringify(n.tags)        + ',\n'
+              + '    date: '        + JSON.stringify(n.date)        + ',\n'
+              + '    lang: '        + JSON.stringify(n.lang)        + ',\n'
+              + '    description: ' + JSON.stringify(n.description) + '\n'
+              + '  }' + (i < state.notes.length - 1 ? ',' : '') + '\n';
+          });
+          js += '];\n';
+          return ghPut('js/data.js', file.sha, js, commitMsg);
         });
       })
-      .then(function (r) {
-        if (r.ok) {
-          modified.forEach(function (id) { NoteStorage.reset(id); });
-          alert('推送成功！' + modified.length + ' 個筆記已更新\n\n請在 WSL 終端機執行：\ncd /mnt/d/notes && git pull');
-          if (state.active) openNote(state.active);
-          else renderSidebar();
-        } else {
-          return r.json().then(function (e) { throw new Error(e.message || r.status); });
-        }
+      /* Step 3: clean up localStorage and notify */
+      .then(function () {
+        modified.forEach(function (id) { NoteStorage.reset(id); });
+        if (deleted.length) NoteStorage.clearDeleted();
+
+        var msg = [];
+        if (modified.length) msg.push(modified.length + ' 個筆記已更新');
+        if (deleted.length)  msg.push(deleted.length  + ' 個筆記已永久刪除');
+        alert('推送成功！' + msg.join('，') + '\n\n請在 WSL 終端機執行：\ncd /mnt/d/notes && git pull');
+
+        if (state.active) openNote(state.active);
+        else renderSidebar();
       })
       .catch(function (e) {
         alert('推送失敗：' + e.message);
@@ -288,6 +353,14 @@ var App = (function () {
 
   /* ── Init ── */
   function init() {
+    /* Filter soft-deleted notes before first render */
+    var deletedOnLoad = NoteStorage.getDeletedIds();
+    if (deletedOnLoad.length) {
+      state.notes = state.notes.filter(function (n) {
+        return deletedOnLoad.indexOf(n.id) < 0;
+      });
+    }
+
     /* Search */
     document.getElementById('search').addEventListener('input', function () {
       state.query = this.value;

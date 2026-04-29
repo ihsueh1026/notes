@@ -34,7 +34,8 @@ var UI = (function () {
     reset:  '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/>',
     upload: '<polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>',
     download: '<polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>',
-    file:   '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'
+    file:   '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    trash:  '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'
   };
 
   /* ── Sidebar ── */
@@ -172,6 +173,7 @@ var UI = (function () {
       +     (isModified ? '<button class="btn danger" id="resetBtn">' + svgIcon(ICONS.reset) + ' 還原</button>' : '')
       +     '<button class="btn" id="copyAllBtn">' + svgIcon(ICONS.copy) + ' 複製</button>'
       +     '<button class="btn success" id="pushBtn">' + svgIcon(ICONS.push) + ' Push</button>'
+      +     '<button class="btn danger" id="deleteBtn">' + svgIcon(ICONS.trash) + ' 刪除</button>'
       +   '</div>'
       + '</div>'
       + '<div class="note-body">'
