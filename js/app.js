@@ -326,8 +326,7 @@ var App = (function () {
 
     function ghGet(path) {
       var url = REPO + path + '?t=' + Date.now();
-      var h = Object.assign({ 'Cache-Control': 'no-cache' }, headers);
-      return fetch(url, { headers: h, cache: 'no-cache' }).then(function (r) {
+      return fetch(url, { headers: headers, cache: 'no-store' }).then(function (r) {
         if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || r.status); });
         return r.json();
       });
