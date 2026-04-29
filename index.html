@@ -1934,6 +1934,145 @@ set wildmenu        " 命令補全選單
 ```
 </script>
 
+<script type="text/plain" id="nc-16">
+# AT over MBIM — QBI 實現
+
+## 概述
+
+QBI (Qualcomm MBIM Interface) 透過 **QMBE** (Qualcomm Mobile Broadband MBIM Extensibility)
+裝置服務的 **CID 7** 提供 AT over MBIM 功能，主要供 **M2PE 工具**使用。
+
+AT 命令由 host 透過 MBIM Query 送入，QBI 將其轉發至 modem 的 SMD 通道 (`/dev/smd7`)，
+讀回 AT 回應後透過 MBIM Response 回傳 host。
+
+---
+
+## 服務識別
+
+| 屬性 | 值 |
+|------|-----|
+| 服務 | QMBE (Qualcomm MB MBIM Extensibility) |
+| UUID | `{2d0c12c9-0e6a-495a-915c-8d174fe5d63c}` |
+| CID  | **7** (`QBI_SVC_QMBE_MBIM_CID_AT_COMMAND`) |
+| 操作 | Query only（無 Set handler） |
+
+QMBE CID 清單（`qbi_svc_qmbe_mbim.h`）：
+
+```c
+QBI_SVC_QMBE_MBIM_CID_DIAG_CONFIG  = 1
+QBI_SVC_QMBE_MBIM_CID_DIAG_DATA    = 2
+QBI_SVC_QMBE_MBIM_CID_DEVICE_LOG   = 3
+QBI_SVC_QMBE_MBIM_CID_SIMLOCK      = 4
+// 5, 6 未定義
+QBI_SVC_QMBE_MBIM_CID_AT_COMMAND   = 7   ← AT over MBIM
+```
+
+---
+
+## 資料結構（`qbi_svc_qmbe_mbim.h`）
+
+```c
+/* Host → QBI: AT 命令請求 */
+typedef PACK(struct) {
+  char   at_cmd[256];    // AT 命令字串（不含 \r）
+  uint32 at_cmd_len;     // 字串長度
+} qbi_svc_qmbe_at_command_q_req_s;
+
+/* QBI → Host: AT 命令回應 */
+typedef PACK(struct) {
+  char   at_cmd_rsp[4096]; // modem 回傳的原始 AT 回應
+  uint32 at_cmd_rsp_len;
+  char   at_cmd_req[256];  // echo：QBI 實際送出的命令（含 \r）
+  uint32 at_cmd_req_len;
+} qbi_svc_qmbe_at_command_q_rsp_s;
+```
+
+---
+
+## 資料流
+
+```
+Host (M2PE Tool)
+  │  MBIM_COMMAND_MSG (type=Query, CID=7)
+  │  InformationBuffer = qbi_svc_qmbe_at_command_q_req_s
+  ▼
+USB/PCIe Transport
+  ▼
+qbi_msg.c → qbi_svc.c  (框架路由)
+  ▼
+qbi_svc_qmbe_at_command_q_req()   [qbi_svc_qmbe.c:1099]
+  │  1. 從 txn->req.data 取出 at_cmd
+  │  2. 在末尾附加 '\r'
+  │  3. 呼叫 qbi_qmbe_smd_write_msg()
+  ▼
+qbi_qmbe_smd_write_msg()          [qbi_svc_qmbe.c:985]
+  │  open("/dev/smd7", O_RDWR | O_NOCTTY | O_NDELAY)
+  │  write(fd, at_cmd, len)
+  │  poll/select 讀回回應（最多 10 次重試）
+  │  close(fd)
+  ▼
+Modem ATCOP (SMD channel 7)
+  │  AT 命令處理
+  ▼
+/dev/smd7 (read back)
+  ▼
+qbi_svc_qmbe_at_command_q_req()
+  │  action = QBI_SVC_ACTION_SEND_RSP
+  ▼
+Host：MBIM_COMMAND_DONE (含 qbi_svc_qmbe_at_command_q_rsp_s)
+```
+
+---
+
+## SMD 讀取細節（`qbi_qmbe_smd_write_msg`）
+
+- 裝置檔：`/dev/smd7`
+- 最大重試：`QBI_QMBE_SMD_MAX_RETRY_COUNT = 10`
+- 有兩種讀取模式（編譯期選擇）：
+  - `#ifdef ATCLI_V3`：使用 `select()` + 300 ms timeout per iteration
+  - 否則：使用 `poll(POLLIN | POLLPRI | POLLERR, timeout=-1)`
+
+---
+
+## Final Response 判斷（`is_final_resp()`）
+
+收到回應後持續累積，直到符合下列 **結尾字串** 或 **內含特殊字串** 才停止讀取：
+
+**正常 final response（尾端比對）：**
+```
+OK\r\n  ERROR\r\n  BUSY\r\n  NO ANSWER\r\n  NO CARRIER\r\n  NO DIALTONE\r\n
+```
+
+**特殊 final response（子字串比對）：**
+```
++CME ERROR:   +CMS ERROR:
+```
+
+---
+
+## 關鍵原始檔
+
+| 檔案 | 說明 |
+|------|------|
+| `qbi/svc/inc/qbi_svc_qmbe_mbim.h` | CID 定義、請求/回應結構體 |
+| `qbi/svc/src/qbi_svc_qmbe.c` | AT command handler、SMD 傳輸實作 |
+| `qbi/framework/src/qbi_svc.c` | CID dispatch 框架 |
+| `qbi/framework/src/qbi_msg.c` | MBIM message 解析/組裝 |
+
+---
+
+## Handler 注册（cmd_hdlr_tbl）
+
+```c
+/* qbi_svc_qmbe_cmd_hdlr_tbl[] 中第 7 個 entry（CID 7）*/
+,{qbi_svc_qmbe_at_command_q_req, 0, NULL, 0}
+//  query_func               min_query_len  set_func  min_set_len
+//  只支援 Query，不支援 Set
+```
+
+注册於 `qbi_svc_qmbe_init()` → `qbi_svc_reg()` 完成服務掛載。
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

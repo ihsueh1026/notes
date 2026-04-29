@@ -133,5 +133,14 @@ var NOTES_META = [
     date: '2026-04-29',
     lang: 'markdown',
     description: 'Vim 常用快捷鍵速查 — 模式切換、移動、編輯、搜尋取代、暫存器、巨集、分割視窗、實用技巧'
+  },
+  {
+    id: 16,
+    title: 'AT over MBIM — QBI 實現',
+    category: 'Docs',
+    tags: ['mbim', 'qbi', 'at-command', 'smd', 'qmbe', 'qualcomm', 'modem'],
+    date: '2026-04-29',
+    lang: 'markdown',
+    description: 'QBI 如何透過 MBIM QMBE 服務 (CID 7) 將 AT 命令轉發至 /dev/smd7 並回傳結果給 host'
   }
 ];
