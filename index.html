@@ -2207,6 +2207,139 @@ OK\r\n  ERROR\r\n  BUSY\r\n  NO ANSWER\r\n  NO CARRIER\r\n  NO DIALTONE\r\n
 #
 </script>
 
+<script type="text/plain" id="nc-18">
+# qmuxbridge 架構
+
+## 概述
+
+Android 使用者空間常駐程式（`qmuxbridge`），在 Android 裝置上充當 QMUX 透明中繼橋接，
+將 Host（Windows/Linux）透過 USB 傳來的原始 QMUX 封包轉送到 Modem SMD 通道，
+反方向亦同，讓 Host 可直接對 Modem 發送 QMI 訊息。
+
+```
+Host (Windows/Linux)
+      │  原始 QMUX 封包
+      ▼
+  /dev/gps  ← USB Gadget (GSI)
+      │
+  qmuxbridge daemon (Android AP)
+      │
+  /dev/smdcntl1  ← SMD 控制通道
+      │
+  Qualcomm Modem
+```
+
+## 原始碼模組
+
+| 檔案 | 功能 |
+|------|------|
+| `qbridge_main.c` | `main()`：初始化、執行緒啟動、狀態機、SMD write |
+| `qbridge_smd.c`  | SMD 端口 open/close、SMD RX 執行緒（`/dev/smdcntl1`）|
+| `qbridge_usb.c`  | USB 監控執行緒、UEvent 執行緒（`/dev/gps`）|
+| `qbridge_dpm.c`  | QMI DPM 開/關端口、EP lookup IOCTL |
+| `qbridge_qmi.c`  | QMI WDA 客戶端初始化，SSR 偵測 error callback |
+| `qbridge_qmux.h` | QMUX 封包結構定義（if_type / hdr / SDU）|
+| `qbridge_log_qxdm.c` | QXDM/Diag 日誌 |
+| `qbridge_log_file.c` | 檔案日誌 |
+
+## 執行緒架構（3 執行緒）
+
+```
+main()
+├── qbridge_qmux_smd_init()   → SMD RX Thread (rx_th_id)
+├── qbridge_start_usb_moniter_thread()    → USB Monitor Thread
+└── qbridge_start_usb_uevent_moniter_thread() → USB UEvent Thread
+```
+
+### SMD RX Thread（`rx_th_id`）
+- 阻塞 `poll()` + `read()` 在 `/dev/smdcntl1`
+- 收到資料 → `qbridge_send_msg_to_host()` → `write(/dev/gps)` 送給 Host
+- USB 未連線時等待 `usb_monitor_semaphore`
+- 收到 SSR 錯誤（ENETRESET / ECONNRESET）→ 跳出迴圈，執行緒結束
+
+### USB Monitor Thread（`usb_monitor_thread_id`）
+- 阻塞 `poll()` + `read()` 在 `/dev/gps`
+- 收到 **0 位元組** 封包 → 觸發 `ioctl(GSI_MBIM_GPS_USB_STATUS)` 查詢 USB line state
+  - USB 斷線 → 關閉 fd，等待 `usb_uevent_cmd_cond`
+  - USB 連線 → 呼叫 `qbridge_dpm_open()`，發送 `sem_post` 通知 SMD 執行緒
+- 收到 **非零** 封包（Host 傳來的 QMUX msg）→ `qbridge_qmux_smd_wait()` → `write(/dev/smdcntl1)`
+
+### USB UEvent Thread（`usb_uevent_monitor_thread_id`）
+- 開啟 `NETLINK_KOBJECT_UEVENT` netlink socket
+- 啟動時先讀 `/sys/devices/virtual/gsi_usb/gps/uevent` 取得初始狀態（避免錯過 boot 事件）
+- 解析 uevent 字串：`STATE=connected` / `STATE=configured` / `STATE=disconnected`
+- USB 變成 CONNECTED → `pthread_cond_signal(usb_uevent_cmd_cond)` 喚醒 USB Monitor Thread
+
+## 執行緒同步
+
+| 機制 | 方向 | 用途 |
+|------|------|------|
+| `usb_monitor_semaphore` (sem_t) | UEvent → SMD 執行緒 | USB connected，通知 SMD 可以開始 open SMD 並收資料 |
+| `usb_uevent_cmd_cond` + mutex   | UEvent → USB Monitor | USB connected，喚醒等待中的 USB Monitor |
+
+## 狀態機
+
+### qbridge_state_e
+```
+OPENING(1) → OPENED(2)   （SMD init + QMI init 成功）
+OPENED(2)  → OPENING(1)  （USB fd 關閉）
+OPENING(1) → CLOSED(0)   → re-init（SSR 完成後自動重試）
+```
+
+### qbridge_usb_state_e
+```
+INVALID(-1) → DISCONNECTED(0) → CONNECTED(1)
+```
+
+## DPM（Data Port Mapper）
+
+使用 QMI DPM 服務通知 Modem 哪條控制通道與哪個 EP（Endpoint）對應：
+
+1. EP lookup：`ioctl(/dev/gps, EP_LOOKUP)` → 取得 `hardware_accl_port_details_v01`
+2. 開端口：`QMI_DPM_OPEN_PORT_REQ_V01`，控制端口 = `DATA6_CNTL`，EP info 由 lookup 提供
+3. 關端口：`QMI_DPM_CLOSE_PORT_REQ_V01`（USB 斷線或 SSR 時）
+
+## SSR（Subsystem Restart）處理
+
+```
+Modem restart
+    → qbridge_qmi_client_error_cb (QMI_SERVICE_ERR)
+    → ssr_in_progress = TRUE
+    → qbridge_close_interface_towards_modem()
+        → qbridge_dpm_close()
+        → qbridge_qmux_smd_close()
+        → state = CLOSED
+        → qbridge_dpm_open()        ← 重新開 DPM
+        → qbridge_initialize_modem_interface()  ← 重新 init SMD + QMI
+```
+
+## QMUX 封包結構（qbridge_qmux.h）
+
+```
+[if_type: 1B]
+[QMUX HDR: length(2) + ctl_flags(1) + svc_type(1) + client_id(1)]
+[SDU (非 CTL): svc_ctl_flags(1) + txn_id(2)]
+  或
+[QMI_CTL SDU:  svc_ctl_flags(1) + txn_id(1)]
+[QMI Msg: msg_id(2) + msg_length(2)]
+[TLV data ...]
+```
+
+## 裝置節點
+
+| 節點 | 方向 | 用途 |
+|------|------|------|
+| `/dev/gps` | Host ↔ AP | USB Gadget 端（`usb_ctrl_qti.h`）|
+| `/dev/smdcntl1` | AP ↔ Modem | SMD 控制通道 |
+| `/sys/devices/virtual/gsi_usb/gps/uevent` | 讀取 | 開機時查詢初始 USB 狀態 |
+
+## 建置（Android.mk）
+
+- 輸出：`qmuxbridge`（可執行檔）
+- 關鍵依賴：`libqmi_cci`、`libqmi_client_qmux`、`libqmiservices`、`libdiag`、`librmnetctl`
+- `qbridge_qmi.c` 未列入 `LOCAL_SRC_FILES`（僅 header 被引用，實際 QMI init 在 main 呼叫）
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

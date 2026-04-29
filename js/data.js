@@ -142,5 +142,14 @@ var NOTES_META = [
     date: "2026-04-28",
     lang: "markdown",
     description: "QmuxMdm Windows KMDF 驅動套件架構 — qcqmux/qcqmuxusb/qcqmuxpcie 三驅動、IOCTL 介面、RMNET 通道、INF 安裝、電源管理、SSR、執行緒架構"
+  },
+  {
+    id: 18,
+    title: "qmuxbridge 架構",
+    category: "Docs",
+    tags: ["qmux","qmi","smd","usb","dpm","ssr","android","daemon","qualcomm","gps"],
+    date: "2026-04-29",
+    lang: "markdown",
+    description: "Android 使用者空間 QMUX 橋接常駐程式 — SMD↔USB 雙向中繼、三執行緒架構、DPM 端口管理、SSR 自動重連"
   }
 ];
