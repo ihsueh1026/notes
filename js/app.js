@@ -270,7 +270,7 @@ var App = (function () {
       .then(function (r) {
         if (r.ok) {
           modified.forEach(function (id) { NoteStorage.reset(id); });
-          alert('推送成功！' + modified.length + ' 個筆記已更新');
+          alert('推送成功！' + modified.length + ' 個筆記已更新\n\n請在 WSL 終端機執行：\ncd /mnt/d/notes && git pull');
           if (state.active) openNote(state.active);
           else renderSidebar();
         } else {
