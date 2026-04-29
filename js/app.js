@@ -325,7 +325,10 @@ var App = (function () {
     var headers = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' };
 
     function ghGet(path) {
-      return fetch(REPO + path, { headers: headers }).then(function (r) { return r.json(); });
+      return fetch(REPO + path, { headers: headers, cache: 'no-cache' }).then(function (r) {
+        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || r.status); });
+        return r.json();
+      });
     }
 
     function ghPut(path, sha, content, msg) {
