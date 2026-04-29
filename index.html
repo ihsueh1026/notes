@@ -479,7 +479,8 @@ notepad "%current_path%_mbn_show.bat"
 pause</script>
 
 <!-- ── Note 2: Repo Init ── -->
-<script type="text/plain" id="nc-2"># === PDK / WearOS ===
+<script type="text/plain" id="nc-2">
+# === PDK / WearOS ===
 # bluefish (IMR1)
 repo init -u https://compal-private.googlesource.com/platform/manifest -b compal-bluefish-rvc-wear-imr1-dev
 
@@ -549,6 +550,9 @@ repo sync -c --no-tags --no-clone-bundle -j4
 repo manifest -o xxx.xml -r
 repo manifest -r --suppress-upstream-revision -o name.xml
 repo forall -p -c "git log --oneline --author=compal"
+repo forall -c 'git checkout sdx12-release-LE1.0_DELL_07.54_LisaSIM_Log_TB'
+repo forall -c 'git reset --hard origin/sdx12-release-LE1.0_DELL_07.54_LisaSIM_Log_TB'
+repo forall -c 'git clean -fd'
 </script>
 
 <!-- ── Note 3: Build Commands ── -->
