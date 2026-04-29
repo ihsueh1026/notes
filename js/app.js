@@ -398,7 +398,7 @@ var App = (function () {
       })
       /* Step 3: clean up localStorage and notify */
       .then(function () {
-        modified.forEach(function (id) { NoteStorage.reset(id); });
+        modified.forEach(function (id) { NoteStorage.clearModified(id); });
         if (deleted.length) NoteStorage.clearDeleted();
         if (savedOrder) localStorage.removeItem('ali_order');
 

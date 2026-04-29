@@ -35,6 +35,11 @@ var NoteStorage = (function () {
       setMod(getMod().filter(function (x) { return x !== id; }));
     },
 
+    /** Remove modified mark only, keep saved content (used after push) */
+    clearModified: function (id) {
+      setMod(getMod().filter(function (x) { return x !== id; }));
+    },
+
     isModified: function (id) {
       return getMod().indexOf(id) >= 0;
     },
