@@ -1400,6 +1400,83 @@ QBI 內部 enum (qbi_qmi_svc_e) 與 QMI wire service ID 對照：
 
 獨立 SMS PDU 編解碼函式庫，支援 GSM/UMTS（3GPP）與 CDMA（3GPP2），
 供 qbi_svc_sms_pdu.c 使用。
+
+---
+
+## 實例：AT over MBIM（QMBE CID 7）
+
+以 AT command 過 MBIM 為範例，說明一個非 QMI 的同步型 CID 如何在框架內實作。
+
+### 位置與 CID 定義
+
+QMBE 服務 (ID 10) 的 CID 7，UUID = `{2d0c12c9-0e6a-495a-915c-8d174fe5d63c}`。
+只支援 **Query**，無 Set handler。
+
+```c
+// qbi_svc_qmbe_mbim.h
+QBI_SVC_QMBE_MBIM_CID_AT_COMMAND = 7   // M2PE tool 使用
+```
+
+### 資料結構
+
+```c
+// 請求（host → QBI）
+typedef PACK(struct) {
+  char   at_cmd[256];    // AT 命令字串（不含 \r）
+  uint32 at_cmd_len;
+} qbi_svc_qmbe_at_command_q_req_s;
+
+// 回應（QBI → host）
+typedef PACK(struct) {
+  char   at_cmd_rsp[4096]; // modem 原始回應
+  uint32 at_cmd_rsp_len;
+  char   at_cmd_req[256];  // echo：實際送出的命令（含 \r）
+  uint32 at_cmd_req_len;
+} qbi_svc_qmbe_at_command_q_rsp_s;
+```
+
+### 資料流
+
+```
+Host MBIM Query (CID=7)
+  ↓
+qbi_msg → qbi_txn_s (cmd_type=QUERY)
+  ↓
+qbi_svc dispatch → qbi_svc_qmbe_at_command_q_req()
+  ↓  附加 '\r'，呼叫 qbi_qmbe_smd_write_msg()
+open("/dev/smd7") → write(at_cmd) → poll/read 回應 → close
+  ↓  action = SEND_RSP（不走 QMI 路徑）
+Host MBIM Response (qbi_svc_qmbe_at_command_q_rsp_s)
+```
+
+### 與標準 QMI 路徑的對比
+
+| 面向 | 標準 QMI CID（如 BC、NAS） | AT over MBIM（QMBE CID 7） |
+|------|---------------------------|---------------------------|
+| 後端協定 | QMI (QCCI) | AT over SMD (`/dev/smd7`) |
+| 非同步 | 是（SEND_QMI_REQ + callback） | 否（同步阻塞讀取） |
+| Action 流程 | SEND_QMI_REQ → callback → SEND_RSP | 直接 SEND_RSP |
+| qmi_txns | 有子交易 | 無 |
+
+### Final Response 判斷（`is_final_resp()`）
+
+SMD 讀取在收到下列字串後停止（最多重試 10 次）：
+
+```
+尾端比對：OK\r\n  ERROR\r\n  BUSY\r\n  NO ANSWER\r\n  NO CARRIER\r\n  NO DIALTONE\r\n
+子字串比對：+CME ERROR:  +CMS ERROR:
+```
+
+### Handler 注册
+
+```c
+// qbi_svc_qmbe_cmd_hdlr_tbl[]（order 對應 CID 號碼）
+,{qbi_svc_qmbe_at_command_q_req, 0, NULL, 0}
+//  query_func              min_q_len  set_func  min_s_len
+```
+
+注册於 `qbi_svc_qmbe_init()` → `qbi_svc_reg()` 完成掛載。
+詳見 `qbi/svc/src/qbi_svc_qmbe.c`。
 </script>
 
 <script type="text/plain" id="nc-13">
