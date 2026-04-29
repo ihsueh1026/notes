@@ -552,7 +552,8 @@ repo forall -p -c "git log --oneline --author=compal"
 </script>
 
 <!-- ── Note 3: Build Commands ── -->
-<script type="text/plain" id="nc-3"># === Build System Image (soong) ===
+<script type="text/plain" id="nc-3">
+# === Build System Image (soong) ===
 build/soong/soong_ui.bash --make-mode TARGET_PRODUCT=bluefish TARGET_BUILD_VARIANT=userdebug droid -j16
 
 # === Build Kernel — triton (arm-eabi-4.8) ===
@@ -600,6 +601,12 @@ prebuilts/misc/linux-x86/ccache/ccache -M 50G
 # === CTS ===
 repo init -u https://android.googlesource.com/platform/manifest -b oreo-cts-dev
 make cts -j4 TARGET_PRODUCT=aosp_arm64
+
+# === Build SDX12 apps ===
+cd ceienv
+source zx12_env.sh
+make apps_clean
+make apps
 </script>
 
 <!-- ── Note 4: ADB Commands ── -->
@@ -961,7 +968,8 @@ scp 0001-factory-patch.patch rdadmin@10.113.8.91:/home/rdadmin/dailybuild
 </script>
 
 <!-- ── Note 8: Gerrit Commands ── -->
-<script type="text/plain" id="nc-8"># === Gerrit SSH — review / submit ===
+<script type="text/plain" id="nc-8">
+# === Gerrit SSH — review / submit ===
 ssh -p 29418 julius_yen@10.113.8.172 gerrit review --verified +1 7752,1
 ssh -p 29418 julius_yen@10.113.8.172 gerrit review --code-review +2 7752,1
 ssh -p 29418 julius_yen@10.113.8.172 gerrit review --submit 7752,1
@@ -1021,6 +1029,10 @@ repo forall -c "git clean -fd"
 # Retail:  https://partner-android-review.googlesource.com/dashboard/self
 # Factory: http://10.113.8.172:8081/#/q/status:open,n,z
 # QCT:     https://createpoint.qti.qualcomm.com/dashboard/public/productkit
+
+# === SDX12 push ===
+GIT_SSH_COMMAND='ssh -oKexAlgorithms=+diffie-hellman-group1-sha1' git push ssh://ali_lin@10.113.8.187:29418/platform/vendor/cei HEAD:refs/for/sdx12-release-LE1.0_X15_ACan
+GIT_SSH_COMMAND='ssh -oKexAlgorithms=+diffie-hellman-group1-sha1' git push ssh://ali_lin@10.113.8.187:29418/sdx12-le-1-0_amss_standard_ceioem HEAD:refs/for/sdx12-release-LE1.0_PCS21_DELL
 </script>
 
 
@@ -1892,6 +1904,9 @@ zR / zM      展開全部 / 收合全部
 :g/pattern/d     刪除所有符合 pattern 的行
 :v/pattern/d     刪除所有不符合 pattern 的行
 ```
+
+1,$s/QBI_LOG_FUNC_ENTER;//g
+1,$s/\/\*-------------------------------------------------------------------------\*\//QBI_LOG_FUNC_ENTER;/g
 
 ---
 
