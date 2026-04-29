@@ -98,8 +98,11 @@ var UI = (function () {
         var cls = 'note-item' + (n.id === activeId ? ' active' : '');
         var dot = modifiedIds.indexOf(n.id) >= 0
           ? '<span class="modified-dot" title="已修改"></span>' : '';
-        return '<div class="' + cls + '" data-id="' + n.id + '">'
-          + '<div class="note-item-title"><span>' + esc(n.title) + '</span>' + dot + '</div>'
+        return '<div class="' + cls + '" data-id="' + n.id + '" draggable="true">'
+          + '<div class="note-item-title">'
+          + '<span class="drag-handle" title="拖曳排序">⠿</span>'
+          + '<span>' + esc(n.title) + '</span>' + dot
+          + '</div>'
           + '<div class="note-item-meta">'
           + '<span class="lang-badge">' + esc(n.lang) + '</span>'
           + '<span>' + esc(n.date) + '</span>'

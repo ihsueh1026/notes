@@ -13,6 +13,8 @@ var App = (function () {
     mode: 'view'         // 'view' | 'edit'
   };
 
+  var dragId = null;    // id of the note currently being dragged
+
   /* ── Content helpers ── */
   function getOriginal(id) {
     var el = document.getElementById('nc-' + id);
@@ -22,6 +24,13 @@ var App = (function () {
   function getContent(note) {
     var saved = NoteStorage.load(note.id);
     return saved !== null ? saved : getOriginal(note.id);
+  }
+
+  /* ── Order persistence ── */
+  function saveOrder() {
+    localStorage.setItem('ali_order', JSON.stringify(
+      state.notes.map(function (n) { return n.id; })
+    ));
   }
 
   /* ── Sidebar ── */
@@ -48,6 +57,63 @@ var App = (function () {
           return n.id === parseInt(el.dataset.id, 10);
         });
         if (note) openNote(note);
+      });
+    });
+
+    /* Drag-to-reorder */
+    document.querySelectorAll('.acc-notes .note-item').forEach(function (el) {
+      el.addEventListener('dragstart', function (e) {
+        dragId = parseInt(el.dataset.id, 10);
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(function () { el.classList.add('dragging'); }, 0);
+      });
+
+      el.addEventListener('dragend', function () {
+        el.classList.remove('dragging');
+        document.querySelectorAll('.note-item.drag-over').forEach(function (x) {
+          x.classList.remove('drag-over');
+        });
+      });
+
+      el.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (parseInt(el.dataset.id, 10) === dragId) return;
+        document.querySelectorAll('.note-item.drag-over').forEach(function (x) {
+          x.classList.remove('drag-over');
+        });
+        el.classList.add('drag-over');
+      });
+
+      el.addEventListener('dragleave', function (e) {
+        if (!el.contains(e.relatedTarget)) {
+          el.classList.remove('drag-over');
+        }
+      });
+
+      el.addEventListener('drop', function (e) {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        var targetId = parseInt(el.dataset.id, 10);
+        if (!dragId || dragId === targetId) return;
+
+        var fromIdx = -1, toIdx = -1;
+        state.notes.forEach(function (n, i) {
+          if (n.id === dragId)   fromIdx = i;
+          if (n.id === targetId) toIdx   = i;
+        });
+        if (fromIdx < 0 || toIdx < 0) return;
+
+        /* Insert before or after target based on mouse vertical position */
+        var rect = el.getBoundingClientRect();
+        var before = e.clientY < rect.top + rect.height / 2;
+
+        var moved = state.notes.splice(fromIdx, 1)[0];
+        if (toIdx > fromIdx) toIdx--;
+        state.notes.splice(before ? toIdx : toIdx + 1, 0, moved);
+
+        saveOrder();
+        renderSidebar();
       });
     });
   }
@@ -360,6 +426,22 @@ var App = (function () {
         return deletedOnLoad.indexOf(n.id) < 0;
       });
     }
+
+    /* Apply saved note order */
+    try {
+      var savedOrder = JSON.parse(localStorage.getItem('ali_order') || 'null');
+      if (savedOrder) {
+        var noteMap = {};
+        state.notes.forEach(function (n) { noteMap[n.id] = n; });
+        var reordered = [];
+        savedOrder.forEach(function (id) { if (noteMap[id]) reordered.push(noteMap[id]); });
+        /* Append any new notes not yet in saved order */
+        state.notes.forEach(function (n) {
+          if (savedOrder.indexOf(n.id) < 0) reordered.push(n);
+        });
+        state.notes = reordered;
+      }
+    } catch (e) {}
 
     /* Search */
     document.getElementById('search').addEventListener('input', function () {

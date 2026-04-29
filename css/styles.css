@@ -162,6 +162,21 @@ body {
 }
 .note-item:hover { background: var(--surface); }
 .note-item.active { background: var(--surface); border-color: var(--accent); }
+.note-item.dragging { opacity: 0.35; }
+.note-item.drag-over { background: var(--accent-bg); border-color: var(--accent); }
+.drag-handle {
+  color: var(--border);
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+  opacity: 0;
+  font-size: .9rem;
+  line-height: 1;
+  padding: 0 2px;
+  transition: opacity .15s, color .15s;
+}
+.note-item:hover .drag-handle { opacity: 1; }
+.note-item:hover .drag-handle:hover { color: var(--muted); }
 .note-item-title {
   font-size: .875rem; font-weight: 500; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
