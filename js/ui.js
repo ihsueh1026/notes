@@ -101,7 +101,7 @@ var UI = (function () {
         return '<div class="' + cls + '" data-id="' + n.id + '" draggable="true">'
           + '<div class="note-item-title">'
           + '<span class="drag-handle" title="拖曳排序">⠿</span>'
-          + '<span>' + esc(n.title) + '</span>' + dot
+          + '<span class="note-item-name">' + esc(n.title) + '</span>' + dot
           + '</div>'
           + '<div class="note-item-meta">'
           + '<span class="lang-badge">' + esc(n.lang) + '</span>'

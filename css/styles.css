@@ -179,11 +179,14 @@ body {
 .note-item:hover .drag-handle:hover { color: var(--muted); }
 .note-item-title {
   font-size: .875rem; font-weight: 500; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   margin-bottom: 4px;
   display: flex; align-items: center; gap: 6px;
+  min-width: 0;
 }
-.note-item-title span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.note-item-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .note-item-meta {
   font-size: .75rem; color: var(--muted);
   display: flex; align-items: center; gap: 8px;
