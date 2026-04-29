@@ -117,15 +117,6 @@ var NOTES_META = [
     description: "QBI (Qualcomm MBIM Interface) 架構分析 — framework、platform、svc、資料流、Action 狀態機"
   },
   {
-    id: 13,
-    title: "QmuxMdm 驅動架構",
-    category: "Docs",
-    tags: ["qmux","qmi","kmdf","wdf","windows","driver","usb","pcie","qualcomm"],
-    date: "2026-04-28",
-    lang: "markdown",
-    description: "QmuxMdm Windows KMDF 驅動套件架構 — qcqmux/qcqmuxusb/qcqmuxpcie 三驅動、IOCTL 介面、RMNET 通道、INF 安裝邏輯"
-  },
-  {
     id: 16,
     title: "AT over MBIM — QBI 實現",
     category: "Docs",
@@ -133,6 +124,15 @@ var NOTES_META = [
     date: "2026-04-29",
     lang: "markdown",
     description: "QBI 如何透過 MBIM QMBE 服務 (CID 7) 將 AT 命令轉發至 /dev/smd7 並回傳結果給 host"
+  },
+  {
+    id: 13,
+    title: "QmuxMdm 驅動架構",
+    category: "Docs",
+    tags: ["qmux","qmi","kmdf","wdf","windows","driver","usb","pcie","qualcomm"],
+    date: "2026-04-28",
+    lang: "markdown",
+    description: "QmuxMdm Windows KMDF 驅動套件架構 — qcqmux/qcqmuxusb/qcqmuxpcie 三驅動、IOCTL 介面、RMNET 通道、INF 安裝邏輯"
   },
   {
     id: 14,
