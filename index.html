@@ -1595,6 +1595,61 @@ qmi_connection_id_type 定義多條虛擬 QMI 通道：
 |------|------|
 | QCCI | 標準 QMI QCCI 客戶端（現代路徑）|
 | Gobi | 舊式 Gobi 驅動客戶端（legacy，需 ALLOC_CLIENT_ID 等額外 IOCTL）|
+
+## 執行緒架構
+
+`QMUX_DEVICE_CONTEXT` 中維護多條執行緒：
+
+| 執行緒 | 觸發方式 | 用途 |
+|--------|----------|------|
+| pManualQueueThread | 啟動時建立 | 處理 ManualQueue 中的 Read 請求 |
+| pWorkItemWorkerThread | 啟動時建立 | 非同步 Work Item 執行（GetClientID / GetMEID / SetDataFormat 等）|
+| ThreadObjects[conn_id] | 每條 conn_id 各一條 | QmuxReadRequestThread：從傳輸層 RX、分發給 client |
+| hThreadTerminationEvent | KEVENT | D0 Exit / 裝置移除時廣播，通知所有執行緒結束 |
+
+QmuxRxThreadEvent / QcciRxThreadEvent 兩個 KEVENT 分別喚醒對應接收執行緒。
+
+## 電源管理
+
+- WDF Directed Power Transition 已啟用（`WdfDirectedPowerTransitionEnable = 1`）
+- USB 路徑：Selective Suspend timeout = **5 秒**
+- PCIe 路徑：Suspend timeout = **10 ms**
+- S0 wake 透過 `QMUX_INTERCONNECT_POWER_INTERFACE` 介面向下層 filter 取得 arm/disarm callback：
+  ```c
+  typedef struct _QMUX_INTERCONNECT_POWER_INTERFACE {
+      INTERFACE Header;
+      PFN_WDF_DEVICE_ARM_WAKE_FROM_S0     QmuxIcPwrEvtArmWakeFromS0;
+      PFN_WDF_DEVICE_DISARM_WAKE_FROM_S0  QmuxIcPwrEvtDisarmWakeFromS0;
+  } QMUX_INTERCONNECT_POWER_INTERFACE;
+  ```
+- 子裝置（GNSS / QNet）可透過 `IOCTL_INTERNAL_QMUX_BUS_REQ_WAKE_GNSS` /
+  `IOCTL_INTERNAL_QMUX_BUS_REQ_WAKE_QNET` 請求 Wait Wake IRP
+
+## SSR（Subsystem Restart）
+
+- `QMUX_DEVICE_CONTEXT.ssrInProgress` 旗標標記數據機重啟中
+- `hSSREvent` KEVENT 通知 SSR 完成
+- SSR 期間 Qmux 需暫停 TX、等待重連後重新執行 CTL Sync + GetVersionInfo 流程
+
+## 對外裝置介面 GUID
+
+| GUID | 名稱 | 用途 |
+|------|------|------|
+| 7714fa50-… | GUID_DEVINTERFACE_QMUXINTERCONNECT | 下層 filter 暴露給 qcqmux 的介面 |
+| 6064DC13-… | GUID_DEVINTERFACE_EXT_QMUX | 外部（user-mode）QMUX 介面 |
+| CDC35B6E-… | GUID_DEVINTERFACE_SERVICE | QMI service 層介面 |
+
+MBIM 全域事件（ExtQmuxInterfaces.h）：
+- `\\GLOBAL??\MBIMArrivalEvent`
+- `\\GLOBAL??\MBIMRemovalEvent`
+- `\\GLOBAL??\MBIMDataReadyEvent`
+
+## Extension INF（QmuxMdmExtension.inx）
+
+獨立的 Extension INF，ExtensionID = `{5A9A19C3-847D-400B-89FC-758F3037CA27}`：
+- 匹配相同的 USB VID/PID 與 PCIe 裝置
+- 新增友善名稱 "Qualcomm QMUX Interconnect with Services"
+- 建立 Software Component：`qcwifinotifiersrvc`（WiFi 通知服務）
 </script>
 
 <script type="text/plain" id="nc-14">
