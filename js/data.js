@@ -151,5 +151,14 @@ var NOTES_META = [
     date: "2026-04-29",
     lang: "markdown",
     description: "Android 使用者空間 QMUX 橋接常駐程式 — SMD↔USB 雙向中繼、三執行緒架構、DPM 端口管理、SSR 自動重連"
+  },
+  {
+    id: 19,
+    title: "QC Poky udev 運作機制",
+    category: "Kernel",
+    tags: ["udev","poky","yocto","qualcomm","rules","smd","mhi","rmnet","rndis","qcmap","radio"],
+    date: "2026-05-05",
+    lang: "markdown",
+    description: "QC Poky 系統中 udev 的完整運作流程 — rules 語法、data_udev_rules/script 解析、裝置權限設定、QCMAP bridge 橋接、Yocto recipe 部署方式"
   }
 ];

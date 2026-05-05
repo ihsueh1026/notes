@@ -2340,6 +2340,116 @@ Modem restart
 - `qbridge_qmi.c` 未列入 `LOCAL_SRC_FILES`（僅 header 被引用，實際 QMI init 在 main 呼叫）
 </script>
 
+<script type="text/plain" id="nc-19">
+## 整體流程
+
+```
+kernel 偵測到裝置
+       │
+       ▼
+udevd (daemon) 收到 uevent
+       │
+       ▼
+掃描 /etc/udev/rules.d/*.rules
+       │
+  條件匹配
+       │
+       ▼
+執行 RUN+= 指定的 script / 設定權限 / 建立 symlink
+```
+
+udev 是 userspace 的裝置管理器，kernel 每次新增/移除裝置節點時，會透過 netlink socket 送出 uevent，`udevd` 接收後根據 rules 決定要做什麼。
+
+---
+
+## Rules 檔解析（`data_udev_rules.rules`）
+
+Rules 放在 `/etc/udev/rules.d/`，檔名決定載入順序（數字越小越早）。
+
+```
+KERNEL=="ttyGS0", RUN+="/etc/udev/scripts/data_udev_script.sh ttyGS0"
+```
+
+| 欄位 | 意義 |
+|------|------|
+| `KERNEL==` | 比對 kernel 裝置名稱（`/sys` 裡的名稱） |
+| `SUBSYSTEM==` | 比對子系統（如 `mtd`、`net`） |
+| `ATTR{name}==` | 比對 sysfs attribute 值 |
+| `RUN+=` | 裝置出現後執行的命令（在 udevd 的 worker process 裡同步執行） |
+| `TAG+="systemd"` | 告訴 systemd 這個裝置需要被追蹤（`rndis0` 有用到） |
+
+監控的裝置類型：
+
+- **ttyGS0/1** — USB Gadget Serial（USB device mode 的虛擬串口）
+- **ttyHS1** — High-Speed UART
+- **smd7~10** — Shared Memory Driver（AP ↔ modem IPC 通道）
+- **mhi_pipe_14/16, mhi_ctrl** — MHI（Modem Host Interface，PCIe-based modem 通道）
+- **dpl_ctrl** — Data Path Logging 控制介面
+- **smdcntl8, rmnet_ctrl** — RMNET 控制通道
+- **bridge\*** — Linux bridge 虛擬網卡（QCMAP 用）
+- **gsb** — General Segmentation Bridge
+- **rndis0** — USB RNDIS 網路介面
+- **mtd emac** — EMAC MAC address 儲存在 MTD partition
+- **switch_ssdk** — SSDK Ethernet switch 控制節點
+
+---
+
+## Script 做的事（`data_udev_script.sh`）
+
+Script 收到裝置名稱作為 `$1`，主要做三件事：
+
+**1. `chown radio:radio /dev/<node>`**
+大多數 modem/data 相關裝置都改成 `radio` user/group，讓 `qcrilhald`、`data-ipa-cfg-mgr` 等 radio group 的 service 能存取，不需要 root。
+
+**2. `chmod` 部分節點**
+`smd8` 額外設 `664`，`switch_ssdk` 設 `660`。
+
+**3. 特殊邏輯**
+
+```sh
+rndis)
+    ifconfig rndis0 up
+    brctl addif bridge0 rndis0   # 把 rndis0 加入 QCMAP 的 bridge0
+;;
+
+mtd)
+    chown radio:radio /dev/$2
+    ln -sf /dev/$2 /tmp/data/early_eth_partition_file  # 給 EMAC 讀 MAC addr
+    chcon system_u:object_r:datamtd_device_t:s0 /dev/$2  # SELinux label
+;;
+```
+
+`rndis` 的處理比較特別：USB 接上 host 時 rndis0 出現，script 直接把它橋接進 `bridge0`，讓 QCMAP 的 NAT/routing 立刻生效，不需要另一個 service 監聽。
+
+---
+
+## Poky/Yocto 部署方式
+
+```bitbake
+SRC_URI += "file://data_udev_rules.rules \
+            file://data_udev_script.sh"
+
+do_install() {
+    install -d ${D}${sysconfdir}/udev/rules.d
+    install -m 0644 ${WORKDIR}/data_udev_rules.rules \
+        ${D}${sysconfdir}/udev/rules.d/
+
+    install -d ${D}${sysconfdir}/udev/scripts
+    install -m 0755 ${WORKDIR}/data_udev_script.sh \
+        ${D}${sysconfdir}/udev/scripts/
+}
+```
+
+---
+
+## 注意事項
+
+1. **`RUN+=` 是同步的**：udevd worker 會等 script 結束才繼續，script 不能 block 太久。
+2. **`mhi_pipe_14` 重複定義**：script 裡 case `mhi_pipe_14` 出現兩次（第 37 行和第 55 行），後者覆蓋前者，功能相同，但屬於 dead code。
+3. **`TAG+="systemd"`（rndis0）**：讓 systemd 可以用 `BindsTo=sys-subsystem-net-devices-rndis0.device` 之類的 unit dependency 等待裝置；其他裝置靠 udev event 觸發 script 就夠了。
+4. **`/dev/kmsg` 當 log**：script 用 `echo > /dev/kmsg` 寫 kernel message buffer，開機期間 logd 還沒起來時最可靠的 debug 方式。
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
