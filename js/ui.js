@@ -162,6 +162,9 @@ var UI = (function () {
 
     return ''
       + '<div class="note-toolbar">'
+      +   '<button class="mobile-back" id="backBtn">'
+      +     svgIcon('<polyline points="15 18 9 12 15 6"/>', 14)
+      +     ' 返回</button>'
       +   '<div class="note-title-area">'
       +     '<h1>' + esc(note.title) + '</h1>'
       +     '<div class="meta">'
@@ -205,6 +208,9 @@ var UI = (function () {
 
     return ''
       + '<div class="note-toolbar">'
+      +   '<button class="mobile-back" id="backBtn">'
+      +     svgIcon('<polyline points="15 18 9 12 15 6"/>', 14)
+      +     ' 返回</button>'
       +   '<div class="note-title-area">'
       +     '<h1>' + esc(note.title) + '</h1>'
       +     '<div class="meta">'

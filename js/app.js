@@ -129,6 +129,15 @@ var App = (function () {
     document.getElementById('mainContent').innerHTML =
       UI.renderNoteView(note, content, isModified);
 
+    /* Mobile: switch to content panel */
+    document.body.classList.add('note-open');
+    var backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+      backBtn.addEventListener('click', function () {
+        document.body.classList.remove('note-open');
+      });
+    }
+
     /* Syntax highlight */
     var codeEl = document.getElementById('codeBlock');
     if (codeEl) Prism.highlightElement(codeEl);
@@ -212,6 +221,15 @@ var App = (function () {
 
     document.getElementById('mainContent').innerHTML =
       UI.renderEditorView(note, content, isModified);
+
+    /* Mobile: back button */
+    var backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+      backBtn.addEventListener('click', function () {
+        document.body.classList.remove('note-open');
+        openNote(note);
+      });
+    }
 
     var ta        = document.getElementById('editorTextarea');
     var lineCount = document.getElementById('lineCount');

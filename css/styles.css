@@ -429,7 +429,63 @@ body {
 .empty-state svg { opacity: .3; }
 .empty-state p { font-size: .9rem; }
 
+/* ── Mobile back button (hidden on desktop) ── */
+.mobile-back {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: .85rem;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
-  .sidebar { width: 220px; min-width: 220px; }
+  /* Single-panel mode: sidebar and main alternate */
+  body { overflow: hidden; }
+
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .main {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+  }
+
+  /* When a note is open, flip panels */
+  body.note-open .sidebar { display: none; }
+  body.note-open .main    { display: flex; }
+
+  /* Back button visible on mobile */
+  .mobile-back { display: flex; }
+
+  /* Toolbar stacks vertically */
+  .note-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 14px;
+    gap: 6px;
+  }
+  .note-title-area h1 { font-size: 1rem; }
+  .toolbar-actions    { flex-wrap: wrap; gap: 6px; }
+
+  /* Note body padding */
+  .note-body { padding: 16px; }
+
+  /* Code block fits viewport */
+  .code-wrap pre { max-height: calc(100vh - 210px); }
+
+  /* Editor */
+  .editor-body { padding: 12px 14px 14px; }
 }
