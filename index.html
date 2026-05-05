@@ -2450,6 +2450,109 @@ do_install() {
 4. **`/dev/kmsg` 當 log**：script 用 `echo > /dev/kmsg` 寫 kernel message buffer，開機期間 logd 還沒起來時最可靠的 debug 方式。
 </script>
 
+<script type="text/plain" id="nc-20">
+## 問題描述
+
+`smd7` 對應的 udev rule 有時不執行，導致 `/dev/smd7` 的 owner 沒有被設成 `radio:radio`，下游 service 存取失敗。
+
+---
+
+## 原因一：開機時序（最常見）
+
+`udevd` 啟動時間可能晚於 smd7 裝置節點出現，early event 若沒有 coldplug replay 就會漏掉。
+
+**確認：**
+```bash
+# 看 smd7 的 uevent 有沒有被 udev 處理到
+udevadm monitor --kernel --udev &
+# 重新觸發一次
+udevadm trigger --action=add --subsystem-match=... /sys/devices/.../smd7
+```
+
+**Workaround：** 補一次 coldplug，或在 data service 啟動前加 fallback：
+```sh
+[ -e /dev/smd7 ] && [ "$(stat -c %U /dev/smd7)" != "radio" ] && \
+    chown radio:radio /dev/smd7
+```
+
+---
+
+## 原因二：SSR 後 event 類型不是 `add`
+
+Modem SSR 後 smd channels 重建，driver 可能送出 `change` 而非 `add` event，但 `RUN+=` 預設只對 `add` 觸發。
+
+**確認：**
+```bash
+udevadm monitor --kernel 2>&1 | grep smd7
+# 看 ACTION= 是 add 還是 change
+```
+
+**Fix：** rules 加上 `ACTION` 匹配：
+```
+KERNEL=="smd7", ACTION=="add|change", RUN+="/etc/udev/scripts/data_udev_script.sh smd7"
+```
+
+---
+
+## 原因三：Rules 語法問題
+
+`smd7` 那行缺少逗號，舊版 udevd 可能解析異常：
+```
+KERNEL=="smd7" RUN+=...      # ← 無逗號（可能有問題）
+KERNEL=="smd10", RUN+=...    # ← 有逗號（標準寫法）
+```
+
+**Fix：** 補上逗號：
+```
+KERNEL=="smd7", RUN+="/etc/udev/scripts/data_udev_script.sh smd7"
+```
+
+---
+
+## 原因四：udevd worker 被 block
+
+`RUN+=` 同步執行，若其他裝置的 script 卡住（如 `brctl addif bridge0 rndis0` 等網路操作），worker pool 滿了會 delay 或 drop 後續 event。
+
+**確認：**
+```bash
+journalctl -u systemd-udevd | grep -iE "worker|timeout|killed"
+```
+
+---
+
+## 原因五：SMD channel 本身沒有 probe
+
+若 modem 側對應 service 未起來，kernel smd driver 不會建立 `/dev/smd7`，udev rule 自然不觸發，這是 modem 問題而非 udev 問題。
+
+**確認：**
+```bash
+ls -la /dev/smd*
+dmesg | grep smd7
+cat /sys/kernel/debug/msm_smd/ch7   # 看 channel 狀態
+```
+
+---
+
+## Debug 快速流程
+
+```
+/dev/smd7 owner 不是 radio？
+        │
+        ├─ ls /dev/smd7 不存在 → modem 沒 probe，看 dmesg
+        │
+        ├─ 存在但 owner 錯誤
+        │       │
+        │       ├─ udevadm monitor 看 ACTION 類型
+        │       │       ├─ 沒收到 event → 時序問題，補 coldplug
+        │       │       └─ 收到 change → rules 加 ACTION=="add|change"
+        │       │
+        │       ├─ journalctl udevd 有 worker timeout → 找卡住的 script
+        │       └─ rules 語法 → 補逗號後 udevadm control --reload
+        │
+        └─ 只有 SSR 後才壞 → ACTION 類型問題
+```
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

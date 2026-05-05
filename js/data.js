@@ -160,5 +160,14 @@ var NOTES_META = [
     date: "2026-05-05",
     lang: "markdown",
     description: "QC Poky 系統中 udev 的完整運作流程 — rules 語法、data_udev_rules/script 解析、裝置權限設定、QCMAP bridge 橋接、Yocto recipe 部署方式"
+  },
+  {
+    id: 20,
+    title: "udev smd7 未觸發 debug 流程",
+    category: "Kernel",
+    tags: ["udev","smd","smd7","debug","ssr","coldplug","qualcomm","poky","radio"],
+    date: "2026-05-05",
+    lang: "markdown",
+    description: "smd7 udev rule 有時未執行的原因分析與 debug 步驟 — 開機時序、SSR 後 event 類型、rules 語法、worker block、modem probe 確認、workaround"
   }
 ];
