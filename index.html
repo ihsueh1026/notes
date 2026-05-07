@@ -2524,6 +2524,121 @@ cat /sys/kernel/debug/msm_smd/ch7
 ```
 </script>
 
+<script type="text/plain" id="nc-20">
+## 安裝
+
+### 前置需求：Node.js ≥ 18
+
+WSL Ubuntu 預設的 apt 版本太舊，建議用 NodeSource 安裝：
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v   # 確認 ≥ 18
+```
+
+或用 nvm（不需要 sudo，版本可隨意切換）：
+```bash
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+```
+
+### 安裝 Claude CLI
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude --version
+```
+
+### 首次登入
+
+```bash
+claude
+# 瀏覽器跳出 Anthropic 登入頁，完成後 token 存在 ~/.claude.json
+```
+
+如果 WSL 沒有辦法自動開瀏覽器：
+```bash
+claude auth login
+# 複製終端機顯示的 URL，貼到 Windows 瀏覽器手動開啟
+```
+
+---
+
+## 常見問題
+
+| 問題 | 原因 | 解法 |
+|------|------|------|
+| `EACCES` 安裝失敗 | npm global 目錄權限問題 | 改用 nvm，或 `npm config set prefix ~/.local` |
+| 登入後仍說未授權 | WSL 時間偏差造成 token 失效 | `sudo hwclock -s` 同步時鐘 |
+| 無法自動開瀏覽器 | WSL 沒有 `xdg-open` 連結 | 手動複製 URL 到 Windows 瀏覽器 |
+| `ENOMEM` 大型 repo | WSL2 預設記憶體限制 2 GB | `~/.wslconfig` 加 `memory=8GB` |
+| proxy 環境無法連線 | 需設 HTTPS_PROXY | `export HTTPS_PROXY=http://proxy:port` |
+
+---
+
+## 使用技巧
+
+### `!` 前綴：在對話中直接執行 shell 指令
+
+在 claude prompt 輸入 `! <command>`，指令會在當前 session 執行，輸出直接進入對話：
+```
+> ! git log --oneline -5
+> ! adb devices
+> ! cat build.log | tail -50
+```
+適合讓 Claude 看到即時的指令輸出再繼續分析，不需要複製貼上。
+
+### CLAUDE.md：專案級別的持久指令
+
+在專案根目錄放 `CLAUDE.md`，Claude 每次進入該目錄都會自動讀取：
+- 描述 build 指令、專案架構、命名慣例
+- 設定「永遠不要做 X」的限制
+- 用 `/init` 讓 Claude 自動分析 codebase 產生初稿
+
+```bash
+claude /init        # 分析當前目錄並產生 CLAUDE.md
+```
+
+### Memory 系統：跨 session 記憶
+
+Claude 會自動把重要資訊存進 `~/.claude/projects/<path>/memory/`，未來 session 自動載入。可以要求 Claude 記住特定事項：
+```
+> 請記住我的 git identity 用 cg 切換到 google 設定
+```
+
+### `/` slash 指令
+
+| 指令 | 用途 |
+|------|------|
+| `/init` | 分析 codebase，產生 CLAUDE.md |
+| `/clear` | 清空對話 context（保留 memory） |
+| `/review` | review 當前 branch 的 PR |
+| `/compact` | 手動壓縮 context，省 token |
+| `/config` | 調整 model、theme 等設定 |
+| `/cost` | 查看本次 session 的 token 用量 |
+
+### 平行工具呼叫
+
+Claude 在執行多個獨立任務時會自動並行呼叫工具（同時讀多個檔案、同時執行多個 grep），比 ChatGPT 類工具快很多，適合大型 codebase 的分析任務。
+
+### 費用控制技巧
+
+- 用 `/compact` 在 context 爆掉前主動壓縮，比等自動壓縮便宜
+- `CLAUDE.md` 的內容會計入每次 context，不要放太多不必要的說明
+- 看完一個獨立任務後用 `/clear` 再開始下一個，避免累積無關 context
+
+### 搭配 screen / tmux 使用
+
+WSL 裡用 `screen` 或 `tmux` 開多個視窗，一個跑 claude，其他視窗正常工作：
+```bash
+screen -S claude   # 開一個 screen session 跑 claude
+# Ctrl+A D 分離，繼續其他工作
+screen -r claude   # 回來繼續
+```
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

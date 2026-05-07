@@ -160,5 +160,14 @@ var NOTES_META = [
     date: "2026-05-05",
     lang: "markdown",
     description: "QC Poky 系統中 udev 的完整運作流程 — rules 語法、data_udev_rules/script 解析、裝置權限設定、QCMAP bridge 橋接、Yocto recipe 部署方式；附 smd7 未觸發 debug 實例與決策樹"
+  },
+  {
+    id: 20,
+    title: "Claude CLI 安裝與使用（WSL）",
+    category: "Docs",
+    tags: ["claude","cli","wsl","nodejs","npm","ai","anthropic","tips"],
+    date: "2026-05-07",
+    lang: "markdown",
+    description: "Claude Code CLI 在 WSL Ubuntu 上的安裝步驟、常見問題排查，以及 ! 指令、memory、/init、MCP、hooks 等實用技巧"
   }
 ];
