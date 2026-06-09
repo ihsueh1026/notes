@@ -182,7 +182,7 @@ var NOTES_META = [
   {
     id: 22,
     title: "LSLink AP Driver Guide",
-    category: "Drivers",
+    category: "Kernel",
     tags: ["lslink","fpga","ice40","spi","i2c","uart","oled","flash","warmboot","ota","driver","ap","qualcomm"],
     date: "2026-06-09",
     lang: "markdown",
