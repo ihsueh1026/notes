@@ -2919,6 +2919,261 @@ make dtbs
 ```
 </script>
 
+<script type="text/plain" id="nc-22">
+# LSLink AP Driver Guide 解讀
+
+## 系統架構
+
+AP/SoC 透過三條匯流排直接連接 **Main iCE40** FPGA，Main 再透過 **LSLink** 把請求轉發給 **Sub iCE40**：
+
+```
+AP/SoC              Main iCE40               Sub iCE40
+────────────        ─────────────────        ─────────────────
+CSR SPI ─────────→  CSR SPI slave   ───────→  CSR register file
+Sensor I2C ──────→  I2C slave        ───────→  I2C master (sensor)
+Camera I2C ──────→  I2C slave        ───────→  I2C master (camera)
+OLED/Finger SPI ─→  SPI slave bridge ───────→  SPI master bridge
+UART ────────────→  CSR SPI path     ───────→  UART TX/RX
+Flash update ────→  Golden flash bridge ─────→  Golden flash bridge
+```
+
+---
+
+## 兩種映像（Image）
+
+| | Golden Image | Feature Image |
+|---|---|---|
+| 用途 | OTA 更新 / boot 管理 | 正常產品運作 |
+| Main VERSION | `0xA1` | `0x13` |
+| Sub VERSION | `0xA2` | `0x13` |
+| Flash 存取 | 有（Main + Sub） | 無 |
+| 功能介面 | 無 | Sensor/Camera I2C、OLED SPI、Finger SPI、UART、PDM、I2S |
+
+驅動啟動時必須先讀 CSR register `0x00` 確認映像版本，再決定啟用哪些介面。
+
+---
+
+## AP SPI Transport
+
+### 規格要求
+
+| 項目 | 值 |
+|------|-----|
+| 時脈 | 目標 20 MHz，可接受 20–25 MHz |
+| CS 操作 | 必須先載入 TX FIFO 再 assert CS |
+| Readback dummy | 明確填 `0x00`，絕不能用隱式 `0xFF` |
+| Main 回應等待 | ~40 µs |
+| Sub 回應等待 | ~200 µs（需過 LSLink） |
+
+### CMD Byte 格式
+
+```
+bit 7  target  0=Main, 1=Sub
+bit 6  rw      0=write, 1=read
+bit 5  stream  0=CSR register, 1=stream channel
+bit 4  flash   (golden image + stream=1 時有效)
+bit 3  burst   0=single-byte, 1=burst
+bit 2:0        保留，填 0
+```
+
+### 主要命令
+
+| 操作 | CMD | 限制 |
+|------|-----|------|
+| Main CSR write | `0x00` | |
+| Main CSR read | `0x40` | 需兩次 transaction |
+| Sub CSR write | `0x80` | |
+| Sub CSR read | `0xC0` | 需兩次 transaction |
+| UART TX byte | `0xA0` | Feature only |
+| UART RX pop | `0xE0` | Feature only，兩次 transaction |
+| Main flash write/burst | `0x30` / `0x38` | Golden only |
+| Sub flash write/burst | `0xB0` / `0xB8` | Golden only |
+| Main flash read/burst | `0x70` / `0x78` | Golden only |
+| Sub flash read/burst | `0xF0` / `0xF8` | Golden only（Feature 的 `0xF0` 是 UART！） |
+
+### 兩次 Transaction 讀取規則
+
+CSR read、UART RX pop、flash FIFO pop 均需兩次 SPI transaction：
+
+```c
+uint8_t lslink_csr_read(uint8_t target, uint8_t addr)
+{
+    uint8_t cmd[3]   = {(target ? 0x80 : 0x00) | 0x40, addr, 0x00};
+    uint8_t dummy[3] = {0x00, 0x00, 0x00};   // 必須明確填 0x00
+    uint8_t rsp[3]   = {0};
+    spi_txn(cmd, sizeof(cmd), NULL, 0);
+    wait_us(target ? 200 : 40);
+    spi_txn(dummy, sizeof(dummy), rsp, sizeof(rsp));
+    return rsp[0];
+}
+```
+
+---
+
+## CSR Register Map
+
+| 地址 | 名稱 | 說明 |
+|------|------|------|
+| `0x00` | VERSION | Main golden=`0xA1`，Sub golden=`0xA2`，feature=`0x13` |
+| `0x01` | LINK_STATUS | bit 0 = LSLink up |
+| `0x02` | GPIO_CTRL | **禁止當 scratch**，會改 HS_PWR_GATE |
+| `0x03–0x05` | SCRATCH | 自由使用（self-test 用 `0x03`） |
+| `0x06` | WARMBOOT | bit 7 = boot trigger，bit 1:0 = 目標 slot |
+| `0x0C` | FINGER_STATUS | bit 0 = data ready，bit 1 = busy |
+| `0x0E–0x0F` | CRC_ERR_L/H | LSLink CRC 錯誤計數，唯讀，飽和於 `0xFFFF` |
+
+Sub VERSION 返回 `0xFF` 代表 LSLink 未就緒，不是有效版本值。
+
+---
+
+## Image 切換（Warmboot）
+
+Multiboot 4 個 slot（0x000000 / 0x020000 / 0x040000 / 0x060000），warmboot sequence：
+
+```c
+void lslink_warmboot(uint8_t target, uint8_t slot)
+{
+    lslink_csr_write(target, 0x06, 0x00);
+    lslink_csr_write(target, 0x06, slot & 0x03);
+    lslink_csr_write(target, 0x06, 0x80 | (slot & 0x03));
+}
+```
+
+**Golden → Feature（Main 先）：**
+```c
+lslink_warmboot(MAIN, 1);  wait_ms(3000);  spi_reinit();
+wait_until(lslink_csr_read(MAIN, 0x00) == 0x13);
+wait_until(lslink_csr_read(MAIN, 0x01) & 0x01);
+lslink_warmboot(SUB, 1);   wait_ms(1000);
+wait_until(lslink_csr_read(SUB,  0x00) == 0x13);
+```
+
+**Feature → Golden（Sub 先）：**
+```c
+lslink_warmboot(SUB,  0);  wait_ms(1000);
+lslink_warmboot(MAIN, 0);  wait_ms(3000);  spi_reinit();
+wait_until(lslink_csr_read(MAIN, 0x00) == 0xA1);
+wait_until(lslink_csr_read(MAIN, 0x01) & 0x01);
+wait_until(lslink_csr_read(SUB,  0x00) == 0xA2);
+```
+
+---
+
+## Golden Flash Driver
+
+Flash 規格：SPI NOR，JEDEC ID `20 BA 16`（4 MiB，256-byte page，4 KiB erase sector）。
+
+### 關鍵規則
+
+| 規則 | 說明 |
+|------|------|
+| Single-byte write | 用於 WREN、Sector Erase 等需要精確 CS deassert 的命令 |
+| Burst write padding | 填 `0xFF`（`0x00` 會把 zero bit 寫進 flash！） |
+| Burst 最大 payload | 62 bytes（64-byte frame 扣掉 2-byte CSR prefix） |
+| Page program chunk | 每次 ≤ 32 bytes，不可跨越 256-byte page boundary |
+| WREN | 每個 erase 和每個 page program chunk 前都必須 WREN |
+| Burst readback 後 | 必須 wait 10 ms 讓 drain 完成才能發下一命令 |
+| Flash FIFO | Main 和 Sub 各自獨立，讀哪個 target 就 drain 哪個 FIFO |
+
+### 完整 Erase + Program 流程
+
+```c
+// 1. 初始化：drain FIFO + release from deep power-down
+flash_drain_fifo(rcmd);
+flash_send_byte(wcmd, 0xAB, true);   // Release from deep power-down (0xAB)
+wait_ms(10);
+flash_drain_fifo(rcmd);
+
+// 2. 4 KiB sector erase
+flash_send_byte(wcmd, 0x06, true);                    // WREN
+flash_send_byte(wcmd, 0x20, false);                   // Sector Erase
+flash_send_byte(wcmd, addr >> 16, false);
+flash_send_byte(wcmd, addr >> 8,  false);
+flash_send_byte(wcmd, addr,       true);
+flash_wait_ready(bcmd, burst_rcmd);                   // poll WIP bit
+
+// 3. Page program（≤32 bytes，不跨 256-byte boundary）
+flash_send_byte(wcmd, 0x06, true);                    // WREN
+// payload = [0x02][addr>>16][addr>>8][addr][data...]
+flash_cmd_burst(bcmd, payload, 4 + len);
+flash_wait_ready(bcmd, burst_rcmd);
+```
+
+Flash 單字節 remote pop 速率約 5 KB/s，burst read 在保守 10 ms guard 下也約 5 KB/s，只適合小量控制資料，不適合大量傳輸。
+
+---
+
+## Feature Image 介面
+
+### Sensor / Camera I2C
+- AP 看到的是 I2C slave on Main，Main 轉發給 Sub
+- 必須停用 AP 的短 SCL timeout（或設 >10 ms），因為 bridge 會 stretch SCL
+- 讀取要實作 retry（建議最多 4 次，間隔 2 ms）
+
+### UART
+- CMD `0xA0` TX，`0xE0` RX（兩次 transaction），115200 baud 8N1
+- RX 返回 `0xFF` 表示 FIFO 空，不是錯誤
+
+### OLED SPI3（Store-and-Forward）
+- Unpacked：`[0x00][cmd]` / `[0x01][data]` byte pairs
+- Packed：marker `0xFF` + 每 9 bytes 編碼 8 個 9-bit frame；不完整的最後一組會被 Sub 丟棄
+- 高速 OLED 寫入用 packed format
+
+### Finger SPI
+- Store-and-forward，command/data 一次 transaction，response 之後另讀
+- 啟動前確認 `FINGER_STATUS (0x0C)` bit 0 = data ready
+
+### PDM / I2S
+- 純硬體介面，無需 CSR enable sequence
+- Feature image + LINK_STATUS[0]==1 時自動運行
+- Link 斷掉會自動 reset/recover，AP 層需重新同步 audio stream
+
+---
+
+## 效能與 Timeout 預算
+
+| 操作 | 預算 |
+|------|------|
+| CSR SPI wire | 0.4 µs/byte @ 20 MHz，64-byte frame ≈ 26 µs |
+| Main CSR read | 等 ~40 µs，timeout ≥ 1 ms |
+| Sub CSR read | 等 ~200 µs，timeout ≥ 1 ms |
+| Link recovery / warmboot | 用秒級 timeout polling VERSION + LINK_STATUS |
+| I2C bridge round trip | SCL stretch 200–400 µs；SCL timeout 應停用或 >10 ms |
+| Page program chunk | timeout ~10 ms |
+| 4 KiB sector erase | WIP polling，timeout ~500 ms |
+
+---
+
+## 常見失效模式
+
+| 症狀 | 可能原因 | 處理方式 |
+|------|---------|---------|
+| Sub VERSION 讀到 `0xFF` | LSLink 未 up，無 remote 回應 | 先確認 LINK_STATUS[0]，retry 直到 timeout |
+| CSR read 干擾 flash/UART | Readback 用了隱式 `0xFF` dummy | 所有 readback transaction 一律填明確 `0x00` |
+| Main CSR 全返回 `0xFF` | AP SPI FIFO 空，CS 時序錯，FPGA 未配置 | 重新 init SPI，確認 CS 時序，讀 Main VERSION |
+| Flash JEDEC 讀到 `FF FF FF` | Flash 未 wake up，命令 target 錯，link down | 執行 flash_prepare，確認命令前綴，查 LINK_STATUS |
+| Flash erase/program 無效果 | 缺 WREN，跨 page boundary，flash 還在 busy | 每 chunk 前 WREN，256-byte boundary 切分，poll WIP |
+| Flash 資料位移 | 舊 FIFO 資料，read 資料偏移量錯誤 | 命令前 drain FIFO，`0x03` read 有效資料從 offset 4 開始 |
+| I2C 返回錯誤或全 `0xFF` | Bridge timeout，NACK，link 中斷 | retry transaction，查 LINK_STATUS 和 CRC delta |
+| OLED packed 資料遺失 | 9-byte group 不完整，marker 錯 | 固定用 `0xFF` marker，每次送完整 8-frame group |
+| CRC 計數增加 | Main 收到壞的 LSLink 封包 | 丟棄/重試當前命令視窗；記錄 baseline 再比 delta |
+
+---
+
+## Driver Checklist（摘要）
+
+- CSR readback transaction TX 一律明確填 `0x00`
+- Sub 操作前先確認 `LINK_STATUS[0]`；Sub VERSION == `0xFF` = 未就緒
+- 依 VERSION 決定介面：Flash 只在 Golden，功能介面只在 Feature
+- Flash burst padding 填 `0xFF`（非 `0x00`）
+- Main/Sub flash FIFO 獨立，讀哪個 target drain 哪個
+- Page program ≤32 bytes，不跨 256-byte page boundary，每 chunk WREN
+- I2C 停用短 SCL timeout，讀取加 retry
+- OLED packed：marker `0xFF`，送完整 9-byte group
+- Warmboot 後必須 reinit AP SPI 並 poll VERSION
+- Scratch 用 `0x03` 以上，禁用 `0x02`
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

@@ -178,5 +178,14 @@ var NOTES_META = [
     date: "2026-06-08",
     lang: "markdown",
     description: "SW6100 build tree 兩個資料夾的架構對比：QSSI 是晶片無關的系統映像（23,538目錄），Vendor 是完整 vendor build（26,277目錄），多出 kernel_platform、non_hlos 韌體（20個子系統）、62個開源驅動、74個 proprietary blob"
+  },
+  {
+    id: 22,
+    title: "LSLink AP Driver Guide",
+    category: "Drivers",
+    tags: ["lslink","fpga","ice40","spi","i2c","uart","oled","flash","warmboot","ota","driver","ap","qualcomm"],
+    date: "2026-06-09",
+    lang: "markdown",
+    description: "LSLink iCE40 FPGA pair 的 AP 側驅動契約：CSR SPI 協議（CMD byte 格式、兩次 transaction 規則）、Golden/Feature 映像切換流程、SPI NOR flash 讀寫操作、Sensor/Camera I2C/UART/OLED/PDM/I2S 介面規範、timeout 預算與常見失效模式"
   }
 ];
