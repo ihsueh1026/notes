@@ -2639,6 +2639,286 @@ screen -r claude   # 回來繼續
 ```
 </script>
 
+<script type="text/plain" id="nc-21">
+# SW6100：QSSI vs Vendor 架構差異
+
+## 本質定義
+
+| | QSSI | Vendor |
+|---|---|---|
+| 定位 | Android Generic System Image（系統分區） | 完整 SW6100 vendor build tree |
+| 目錄數 | 23,538 | 26,277 |
+| 晶片相依性 | 無（跨 SoC 共用） | SW6100 / Aspen 平台專屬 |
+| 包含關係 | 被 Vendor 完整包含 | QSSI 的超集 |
+
+**原理：** Android Project Treble 要求 system 與 vendor 分區獨立更新。QSSI 是 Qualcomm 提供給 OEM 的參考系統映像，可跨多款 Snapdragon SoC 共用；Vendor tree 是晶片完整 build 所需的全部原始碼。
+
+---
+
+## Vendor 獨有的 Top-Level 目錄（6 個）
+
+### 1. `kernel_platform/`
+完整 kernel 原始碼，以 **Bazel + Kleaf** 構建：
+- `bootable/bootloader/edk2` — UEFI/EDK2 bootloader
+- `bootable/recovery/` — Android Recovery
+- Bazel symlinks 指向 `bazel-cache/`（kernel build artifact 快取）
+
+### 2. `non_hlos/`（最關鍵差異）
+所有非 Linux OS 韌體子系統，共 20 個：
+
+| 子目錄 | 用途 |
+|--------|------|
+| `modem_proc` | 蜂窩數據機韌體 |
+| `adsp_proc` | 音訊 DSP（FastRPC、QNN AI 引擎、audio_fw） |
+| `cdsp_proc` | 計算 DSP（Hexagon） |
+| `btfw_proc` | 藍牙韌體 |
+| `wlan_proc` | Wi-Fi 韌體 |
+| `aop_proc` | Always-On Processor（低功耗狀態管理） |
+| `cpucp_proc` | CPU Control Processor |
+| `dcp_proc` | Display Co-Processor |
+| `wm_proc` | Watch Mode 處理器 |
+| `trustzone_images` / `tmel` / `qtee_tas` / `smc_themiso` | TrustZone / 安全飛地 |
+| `boot_images` | 預建 bootloader 映像 |
+| `LINUX` | DSP 上的嵌入式 Linux（FastRPC daemon 端） |
+| `acpolicy`, `common`, `metadata`, `out`, `out_symbol` | AC policy、共用定義、build 產物 |
+
+### 3. `layers/`
+Yocto meta-layer：`meta-qti-audio` — AudioReach 音訊框架的嵌入式 Linux 食譜。
+
+### 4. `meta-qti-display/`
+Yocto 顯示 meta-layer，嵌入式 Linux 場景用。
+
+### 5. `bazel-cache/`
+`kernel_platform` Bazel 構建的 execroot 快取。
+
+### 6. `shortcut-fe/`
+網路封包 shortcut forwarding 驅動（硬體加速路由）。
+
+---
+
+## `vendor/qcom/opensource`（開源硬體驅動與 HAL）
+
+| | QSSI | Vendor |
+|---|---|---|
+| 目錄數 | 7（平台中性） | 69（含晶片專屬） |
+
+Vendor 多出的 62 個，按類型：
+
+- **音訊**：`agm`, `audio-hal`, `audio-kernel`, `pal`, `audioreach-conf`, `audio-devicetree`, `audio_ftm`, `audio_mcs`, `audio-vibrator`, `mm-drivers`
+- **顯示**：`display`, `display-core`, `display-drivers`, `display-devicetree`, `display-intf`
+- **連線**：`bt-kernel`, `bt-external`, `bt-devicetree`, `wlan`, `usb`, `datarmnet`, `dataipa`, `datarmnet-ext`, `dataservices`, `dpm`, `data-kernel`, `data-ipa-cfg-mgr`
+- **相機**：`camera-kernel`
+- **GPU**：`graphics-kernel`
+- **影片**：`video-driver`, `video-devicetree`
+- **感測器**：`sensing-hub`
+- **系統服務**：`thermal-engine`, `thermal-hal`, `power`, `location`, `time-services`, `recovery-ext`, `synx-kernel`, `securemsm-kernel` 等
+
+---
+
+## `vendor/qcom/proprietary`（閉源 vendor blob）
+
+| | QSSI | Vendor |
+|---|---|---|
+| 目錄數 | 12（主要 Wear OS 相關） | 86 |
+
+Vendor 多出的 74 個，關鍵項目：
+
+- **相機**：`camx`, `chi-cdk`, `camx-api`（Camera eXpert 框架）
+- **電話**：`qcril-nr`, `qcril-data-hal`, `qcril-qmi-services`, `qcril-qmi-services-headers`
+- **QMI 協議棧**：`qmi`, `qmi-framework`, `qmi-ext`（與本 repo 其他 project 直接相關）
+- **音訊**：`mm-audio`, `mm-audio-headers`
+- **安全**：`securemsm`, `mink`, `sectools`
+- **DSP/AI**：`dspservices_ship`, `sensors-android`, `sensors-ship`
+- **診斷**：`diag`, `diag-router`
+- **位置**：`gps`, `gps-release`
+- **顯示/圖形**：`display`, `graphics`, `graphics-devicetree`
+- **其他**：`perf-core`, `thermal-engine`, `time-services`, `remotefs`, `ss-restart`, `subsys-mgmt`, `telephony-apps` 等
+
+---
+
+## 架構關係圖
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   Vendor Tree                        │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │              QSSI Tree                       │   │
+│  │  AOSP framework + 平台中性 Qualcomm 服務     │   │
+│  │  (可跨多款 Snapdragon SoC 共用的系統映像)    │   │
+│  └──────────────────────────────────────────────┘   │
+│                                                      │
+│  + kernel_platform/   (SW6100 專屬 kernel + EDK2)   │
+│  + non_hlos/          (modem/ADSP/CDSP/BT/WLAN 韌體)│
+│  + 62個 開源 vendor driver (音訊/顯示/連線/相機…)   │
+│  + 74個 閉源 proprietary blob (QMI/QCRIL/camx…)     │
+│  + Yocto layers (AudioReach / display)               │
+│  + shortcut-fe (網路快速轉發)                        │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 可以單獨替換 boot.img 嗎？
+
+**可以，但有條件。** SW6100 使用 GKI + DLKM 架構，boot.img 本身只含 GKI kernel，硬體驅動在獨立分區，天生支援單換。
+
+### Boot 分區完整結構
+
+```
+[EDK2/XBL]    → xbl 分區        ← UEFI 第一階段 bootloader（non_hlos/boot_images/edk2）
+      ↓
+[ABL]          → abl 分區        ← vienna-kernel/kernel-abl，UEFI app 載入 Android
+      ↓
+[boot]         → boot.img        ← GKI kernel（你想換的）
+[init_boot]    → init_boot.img   ← Android 13+ generic ramdisk + init（分離）
+[vendor_boot]  → vendor_boot.img ← vendor ramdisk + 早期啟動 kernel modules
+[dtbo]         → dtbo.img        ← Device Tree Overlay（vienna-kernel/kp-dtbs）
+[vendor_dlkm]  → 硬體驅動模組   ← vienna-kernel/vendor_dlkm/
+[system_dlkm]  → system 模組    ← vienna-kernel/system_dlkm/
+```
+
+`vendor_dlkm` / `system_dlkm` 在目錄樹中是獨立的 prebuilts 分區，**不在 boot.img 裡**。
+
+### 何時可以單換
+
+| 情境 | 結果 |
+|------|------|
+| 同 GKI 版本，只改 config / patch | ✅ vendor 模組 ABI 相容，正常啟動 |
+| `fastboot boot boot.img`（RAM 啟動，不刷入） | ✅ 最安全的測試方式 |
+| 跨 GKI 版本（如 5.15 → 6.1） | ❌ vendor_dlkm 模組無法載入 |
+| 修改了 kernel 匯出符號（KMI break） | ❌ Wi-Fi、相機、modem 驅動失敗 |
+
+### Modem / DSP 不受影響
+
+`non_hlos/modem_proc`、`adsp_proc` 等韌體透過 **QMI over SMD/MHI** 與 AP 通訊，不依賴 boot.img。換 boot.img 不影響數據機韌體，除非動到相關 kernel driver（如 `qcom-Q6V5-pil`）的 API。
+
+### 實際指令
+
+```bash
+# 測試（RAM 啟動一次，不刷入）
+fastboot boot boot.img
+
+# 正式刷入
+fastboot flash boot boot.img
+
+# 生產裝置需先解鎖 AVB
+fastboot flashing unlock
+# 或開發版關閉驗證
+fastboot --disable-verification flash boot boot.img
+```
+
+---
+
+## 只改 Device Tree 呢？
+
+比換 boot.img 更輕量。SW6100 的 Device Tree 編譯後**不在 boot.img 裡**，分散在三個地方：
+
+```
+DTS 來源（多個 repo）                    編譯後落點
+─────────────────────────────────────────────────────────────
+kernel_platform/.../devicetree  ─┐
+vendor/qcom/opensource/          │  → DTBs  → vendor_boot.img
+  audio-devicetree               │             (不動 boot.img)
+  bt-devicetree                  │
+  display-devicetree             │
+  camera-devicetree ...         ─┘
+
+板級 overlay (SKU/variant)       ──→ DTBO  → dtbo 分區（獨立）
+
+vienna-kernel/kp-dtbs            ──→ XBL/ABL 讀取，Linux 啟動前
+                                      → abl / 相關 bootloader 分區
+```
+
+### 依改動範圍決定要刷哪個分區
+
+| 改動類型 | 例子 | 需刷分區 |
+|---------|------|---------|
+| 板級 overlay（GPIO、regulator 電壓、某功能開關） | 改某個 SKU 的 pin config | `dtbo` 分區只 |
+| SoC 核心 DT（新加 peripheral、clock、interrupt） | 加一顆 I2C 裝置 | `vendor_boot` |
+| bootloader 平台 DT（kp-dtbs） | XBL 階段硬體初始化 | `abl` / bootloader 分區 |
+
+**boot.img 完全不用動。non_hlos 韌體也不受影響。**
+
+### 實際指令
+
+```bash
+# 只改 DTBO（最常見情況）
+fastboot flash dtbo dtbo.img
+
+# 改了 base DTB（在 vendor_boot 裡）
+fastboot flash vendor_boot vendor_boot.img
+```
+
+### DTS 來源分散在多個 repo
+
+Qualcomm 把 DT source 按子系統拆開（`audio-devicetree`、`bt-devicetree`、`display-devicetree`、`camera-devicetree` 等 vendor/qcom/opensource 下的各 repo），build 時才合併。改單一子系統的 DT，只需重 build 並 flash `vendor_boot` 或 `dtbo`，不影響其他分區。
+
+---
+
+## 如何單獨 build DTBO
+
+SW6100 用 **Kleaf（Bazel）** 建構 kernel，DTBO 有獨立的 Bazel target，不需要 full kernel build。
+
+### 查詢可用的 DTBO target
+
+```bash
+cd kernel_platform/
+
+# 列出所有 dtbo 相關 target
+tools/bazel query 'attr(name, ".*dtbo.*", //...)'
+
+# 列出 msm-kernel 下所有 target
+tools/bazel query '//msm-kernel:*'
+```
+
+基於 `out/msm-kernel-vienna-consolidate/` 的命名，target 格式通常是：
+
+```bash
+# 只 build dtbo
+tools/bazel build //msm-kernel:vienna_consolidate_dtbo
+# 或
+tools/bazel build //msm-kernel:aspen_dtbo
+```
+
+### DTS 來源如何納入
+
+`vendor/qcom/opensource/` 下各 `-devicetree` repo 的 `.dts` / `.dtsi` 透過 `kernel_platform/qcom/opensource/devicetree/` 的 Kleaf BUILD 規則被引用。改這些 repo 後重跑 Bazel target 即可重新編譯。
+
+### Build 輸出位置
+
+```
+kernel_platform/out/msm-kernel-vienna-consolidate/dist/
+├── dtbo.img        ← flash 用
+├── dtbs/           ← base DTBs (for vendor_boot)
+└── ...
+```
+
+### 完整流程
+
+```bash
+# 1. 修改 DTS
+vim vendor/qcom/opensource/audio-devicetree/aspen-audio.dtsi
+
+# 2. 只 build DTBO
+cd kernel_platform/
+tools/bazel build //msm-kernel:<vienna_dtbo_target>
+
+# 3. Flash（不需動 boot.img 或 vendor_boot）
+fastboot flash dtbo out/msm-kernel-vienna-consolidate/dist/dtbo.img
+fastboot reboot
+```
+
+### 傳統 make 方式（非 Kleaf）
+
+```bash
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-android-
+make msm_defconfig
+make dtbs
+```
+</script>
+
 <!-- ── Dependencies ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>

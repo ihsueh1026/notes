@@ -169,5 +169,14 @@ var NOTES_META = [
     date: "2026-05-07",
     lang: "markdown",
     description: "Claude Code CLI 在 WSL Ubuntu 上的安裝步驟、常見問題排查，以及 ! 指令、memory、/init、MCP、hooks 等實用技巧"
+  },
+  {
+    id: 21,
+    title: "SW6100：QSSI vs Vendor 架構差異",
+    category: "Docs",
+    tags: ["sw6100","qssi","vendor","android","treble","non_hlos","kernel","qualcomm","aspen"],
+    date: "2026-06-08",
+    lang: "markdown",
+    description: "SW6100 build tree 兩個資料夾的架構對比：QSSI 是晶片無關的系統映像（23,538目錄），Vendor 是完整 vendor build（26,277目錄），多出 kernel_platform、non_hlos 韌體（20個子系統）、62個開源驅動、74個 proprietary blob"
   }
 ];
