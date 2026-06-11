@@ -183,9 +183,18 @@ var NOTES_META = [
     id: 22,
     title: "LSLink AP Driver Guide",
     category: "Kernel",
-    tags: ["lslink","fpga","ice40","spi","i2c","uart","oled","flash","warmboot","ota","driver","ap","qualcomm"],
-    date: "2026-06-09",
+    tags: ["lslink","fpga","ice40","spi","i2c","uart","oled","flash","warmboot","ota","driver","ap","qualcomm","glink","awm","adb"],
+    date: "2026-06-11",
     lang: "markdown",
-    description: "LSLink iCE40 FPGA pair 的 AP 側驅動契約：CSR SPI 協議（CMD byte 格式、兩次 transaction 規則）、Golden/Feature 映像切換流程、SPI NOR flash 讀寫操作、Sensor/Camera I2C/UART/OLED/PDM/I2S 介面規範、timeout 預算與常見失效模式"
+    description: "LSLink iCE40 FPGA pair 的 AP 側驅動契約：CSR SPI 協議（CMD byte 格式、兩次 transaction 規則）、Golden/Feature 映像切換流程、SPI NOR flash 讀寫操作、Sensor/Camera I2C/UART/OLED/PDM/I2S 介面規範、timeout 預算與常見失效模式。含實作章節：AWM(Zephyr) 上的 lslink_service G-Link 控制服務 + Android(apss) 端可透過 adb shell 操作的 lslink_cli（glink_pkt /dev 節點）"
+  },
+  {
+    id: 23,
+    title: "SW6100 wm_proc：Zephyr 永遠在線協處理器韌體",
+    category: "Kernel",
+    tags: ["sw6100","wm_proc","zephyr","lpai","law","aspen","sensinghub","always-on","wearos","coprocessor","glink","display-lpi","qualcomm"],
+    date: "2026-06-11",
+    lang: "markdown",
+    description: "wm_proc 是 SW6100 手錶平台的低功耗 always-on 協處理器韌體，跑 Zephyr RTOS（非 Linux）。兩個 variant 其實是兩顆微核：AWM=Ambient Micro(SMEM_AM=24)、SWM=Wear Micro(SMEM_WM=23)。五大子系統：core_ect(平台/匯流排/PMIC/mproc)、sensinghub(感測中樞+QNN)、display_lpi(AOD 顯示)、qdl-drivers(DSI 管線)、ssg(安全)、productsw。IPC 三層堆疊：SMEM(共享RAM+host拓樸+spinlock)→SMP2P(跨核GPIO中斷信號)→G-Link(命名通道/RX intent/QoS)，與 Android 主核(SMEM_APPS=0,apss)對接。bmm350 是 bmm360 的 Zephyr 版"
   }
 ];

@@ -3172,6 +3172,223 @@ Flash 單字節 remote pop 速率約 5 KB/s，burst read 在保守 10 ms guard �
 - OLED packed：marker `0xFF`，送完整 9-byte group
 - Warmboot 後必須 reinit AP SPI 並 poll VERSION
 - Scratch 用 `0x03` 以上，禁用 `0x02`
+
+---
+
+# 實作：AWM lslink_service（2026-06-11）
+
+依本指南在 SW6100 **AWM（Ambient Micro，Zephyr 協處理器）** 上實作了一個 G-Link 控制服務，並提供 Android(apss) 端可透過 adb 操作的 CLI。位置：`sw6100/drivers/wm_proc/productsw/lslink_service/`。詳見 note #23（wm_proc）的 IPC 段落。
+
+## 端到端資料流
+
+```
+Android(apss)                                   AWM(Zephyr)
+  lslink_cli ──write()/read()──► /dev/lslink_ctrl
+                                   │ glink_pkt kernel driver
+                                   └─ G-Link "LSLINK_CTRL" ─► lslink_service.c
+                                                                 │ msgq → worker thread
+                                                              lslink_core.c（協議引擎）
+                                                                 │ lslink_hal_xfer()
+                                                              lslink_hal_spi.c ─SPI─► Main iCE40 ─LSLink─► Sub iCE40
+```
+
+## 韌體端檔案分層（AWM）
+
+| 檔案 | 對應本指南的部分 |
+|------|----------------|
+| `inc/lslink_proto.h` | CMD byte 位元定義、CSR register map、VERSION 碼、timing 預算（純常數轉錄） |
+| `inc/lslink_msg.h` | **G-Link wire format**（host↔韌體共用）：packed req/rsp + opcode + status |
+| `src/lslink_core.c` | 協議引擎：CSR write（單次）、**CSR read（兩次 transaction + 明確 `0x00` dummy）**、image 分類、warmboot、Golden↔Feature 有序切換序列 |
+| `src/lslink_hal_spi.c` | SPI 綁定（`spi_full_duplex`，Mode0/CS-low/20 MHz）；**SPI 腳位 TBD 集中於此** |
+| `src/lslink_service.c` | G-Link 服務：link/channel 生命週期、rx cb 不阻塞（丟 msgq）、worker thread 執行後 `glink_tx` 回應 |
+
+關鍵設計：`image_switch` 會阻塞數秒（warmboot 3s+1s），所以 rx callback 只複製 request 進 message queue，由 worker thread 跑 SPI，符合 G-Link dispatch context 不可阻塞的要求。
+
+## Host 端 CLI（apss / Android）
+
+`host/lslink_cli.c` — **直接 include 韌體的 `lslink_msg.h`**，wire format 單一來源、兩端永不漂移。透過 kernel **glink_pkt** 驅動暴露的 `/dev/lslink_ctrl` 字元裝置 `open/write/poll/read`。
+
+```sh
+adb push lslink_cli /data/local/tmp/ && adb shell chmod 755 /data/local/tmp/lslink_cli
+
+adb shell /data/local/tmp/lslink_cli version main     # VERSION = 0xA1 / 0x13
+adb shell /data/local/tmp/lslink_cli linkup           # LSLink up = 1
+adb shell /data/local/tmp/lslink_cli image            # GOLDEN / FEATURE
+adb shell /data/local/tmp/lslink_cli read  sub  0x00  # 原始 CSR 讀
+adb shell /data/local/tmp/lslink_cli write main 0x03 0xAB
+adb shell /data/local/tmp/lslink_cli switch feature   # Golden→Feature（阻塞數秒）
+```
+
+CLI 命令：`ping / linkup / image / version / read / write / warmboot / switch`。數字吃 hex 或十進位；exit code 區分 OK / firmware-error / IO-error。`read`/`write` 為 raw CSR（bring-up 除錯用，仍須遵守上述地雷如 `0x02` 不可當 scratch）；`switch`/`warmboot` 已封裝指南規定的有序時序。
+
+## 待定（與 schematic 連動）
+
+- **SPI 腳位**：`CONFIG_LSLINK_SPI_*`（QUP / SE index / CS index）目前為 placeholder，定案後建議移進 AWM devicetree
+- **multiboot slot 對應**：`image_switch` 暫設 slot0=Golden、slot1=Feature
+- **kernel glink_pkt 節點**：edge 名稱（常見 `"awm"`）、`dev-name → /dev/lslink_ctrl`；channel name `LSLINK_CTRL` 兩端必須一致（kernel 實際比對的鍵）
+</script>
+
+<script type="text/plain" id="nc-23">
+# SW6100 wm_proc：Zephyr 永遠在線協處理器韌體
+
+## 它是什麼
+
+**WM_PROC = Wearable Module Processor** — SW6100（Vienna / Wear OS 智慧手錶平台）上的**低功耗永遠在線協處理器（always-on co-processor）韌體**。跑的是 **Zephyr RTOS**（不是 Linux），與 Android 主系統（QSSI + Vendor）是**兩個獨立的 processor**。
+
+| 識別資訊 | 值 |
+|---------|-----|
+| Git branch | `SW6100.LAW.1.0-GZI3`（**LAW** = Low-power Always-on Wearable）|
+| Image tree | `LPAI.WM.1.2`（**LPAI** = Low Power AI Island）|
+| RTOS | Zephyr（整個 upstream Zephyr tree 約 35,840 檔）|
+| 建構系統 | Qualcomm `build.qc.2.0` + CMake + West |
+| Python | 3.12.10（image_info.json 指定）|
+
+## 兩個 build variant
+
+`image_info.json` 只暴露兩個整合目標：
+
+| Variant | 含義 | 用途 |
+|---------|------|------|
+| `aspen.awm.law_prod` | **AWM** = Always-on Wearable Module | 永遠在線島，含 AI/感測融合 |
+| `aspen.swm.prod` | **SWM** = Sensing Wearable Module | 純感測島 |
+
+`aspen` 是此協處理器的 SoC/island codename。建構入口：`wm_proc/build/ms/build.sh <variant>` → `build_variant.py`。
+（`config/` 下另有 glymur/balsam/kaanapali/molokai… 數十個其他平台 codename，但本 branch 只 build aspen。）
+
+## 五大子系統
+
+```
+wm_proc/
+├── zephyr/         Zephyr RTOS 核心 + Qualcomm corezephyr 擴充 (go/corezephyr)
+├── core_ect/       【核心平台】Embedded Common Technology — 412 .c
+│   ├── buses/      i2c, spi, qmspi, uart, gpi, qup  ← 周邊匯流排驅動
+│   ├── pmic/       PMIC 電源管理 (spmi, pm)
+│   ├── mproc/      多核 IPC：glink, smem, smp2p  ← 與 Android 主核通訊
+│   └── boot/       開機
+├── sensinghub/     【感測中樞】SEE-like sensor framework — 378 .c
+│   ├── sensors/drivers/  實體 sensor 驅動：
+│   │     ak0991x(磁), bmm350(磁), bmp5(氣壓),
+│   │     ct7117x(溫), lsm6dsv(IMU), max86178(PPG/心率),
+│   │     opt3001(光), drv_accep
+│   ├── drivers/    QSH 服務：qsh_ble, qsh_wifi, qsh_wwan, qsh_modem,
+│   │               qsh_location, qsh_geofence, qsh_audio  ← 連線/定位橋接
+│   ├── algorithms/ oem1, qnn_oem1 (QNN = Qualcomm Neural Network 推論)
+│   └── platform/   PAL/OSA 抽象層
+├── display_lpi/    【低功耗顯示】LPI = Low Power Island display — 256 .c
+│   ├── display_drv/ 面板驅動   ├── touch/ 觸控
+│   └── display_apps/ 錶面 / AOD always-on display 應用
+├── qdl-drivers/    【顯示管線】DSI(面板,M55), dcp_mgr, hfi, wfd — 41 .c
+├── ssg/            【安全】Snapdragon Secure Gateway — bam(DMA), hwkm(金鑰),
+│                   tme(信任管理), access_control, uclib
+└── productsw/      【產品服務】audio/battery/haptics/bt/ml/
+                    rsb_service(旋轉錶冠)/wrist_orientation/offload_mgr
+```
+
+## 與 Android 主系統的關係
+
+```
+┌─────────────────────────────┐         ┌──────────────────────────┐
+│  Android (QSSI + Vendor)    │  glink  │  wm_proc (Zephyr)        │
+│  跑在 AP 大核                │◄───────►│  always-on co-processor  │
+│                             │ mproc/  │  低功耗島                 │
+└─────────────────────────────┘  smem   └──────────────────────────┘
+        手錶亮屏 / 重負載                    AOD 錶面、心率、計步、
+                                          抬腕偵測、地理圍籬
+```
+
+兩者透過 `core_ect/mproc/`（glink / smem / smp2p 共享記憶體 IPC）通訊。手錶熄屏時主核睡眠，由 wm_proc 持續處理感測與顯示 AOD — 這是 Wear OS 續航的關鍵。
+
+---
+
+# IPC 技術細節：core_ect/mproc
+
+Qualcomm 跨核通訊是**三層堆疊**，三者分工明確：
+
+```
+   應用 / 服務層
+        │  glink_open() / glink_tx() / notify_rx callback
+┌───────▼────────────────────────────────────────────┐
+│  G-Link  (邏輯通道層 / RPC-like)                     │
+│  多工命名通道、流量控制(QoS)、RX intent、訊號線     │
+│  glink/core/                                         │
+├──────────────────────┬──────────────────────────────┤
+│  xport_smem          │  SMP2P                        │
+│  (資料搬運)           │  (中斷信號 / GPIO-like 狀態) │
+│  glink/xport_smem/   │  smp2p/                       │
+├──────────────────────▼──────────────────────────────┤
+│  SMEM  (Shared Memory 配置 + spinlock)               │
+│  smem/  — 跨核共享 RAM 的分割、配置、版本協商        │
+└──────────────────────┬──────────────────────────────┘
+                       │
+              實體共享 RAM + 硬體中斷線
+```
+
+## 1. SMEM — Shared Memory（最底層）
+
+跨核共用的一塊實體 RAM，所有上層 IPC 的資料都放這裡。
+
+- **host 拓樸**：每個 processor 是一個 "host"，由 `core_ect/api/mproc/smem_type.h` 的 `smem_host_type` enum 定義（共 25 個）。本平台關鍵 host：
+
+  | ID | enum | name | 角色 |
+  |----|------|------|------|
+  | 0 | `SMEM_APPS` | apss | **Android 主核**（你 build 的那個）|
+  | 1 | `SMEM_MODEM` | mpss | 數據機 |
+  | 2 | `SMEM_ADSP` | lpass | 音訊 DSP |
+  | 23 | `SMEM_WM` | **swm** | Wear Micro（= `aspen.swm.prod` variant）|
+  | 24 | `SMEM_AM` | **awm** | Ambient Micro（= `aspen.awm.law_prod` variant）|
+
+  → **重要**：wm_proc 的兩個 variant 其實是**兩顆不同的微核**（SWM 感測核 + AWM 環境/顯示核），不只是兩種 build。本核身份由 devicetree `DT_PROP(.../smem, host)` 決定（`SMEM_THIS_HOST`）。
+
+- **檔案**：
+  - `smem/src/smem.c` — 核心 alloc / 分割管理
+  - `smem/src/smem_partition.c` — per-host partition（每對 host 有獨立分割避免互踩）
+  - `smem/src/spinlock.c` — 跨核硬體 spinlock（`SMEM_SPINLOCK_PID = THIS_HOST+1`）
+  - `smem/src/smem_legacy.c` — 舊式非分割相容模式
+  - `smem/inc/smem_toc.h` — Table of Contents（SMEM 頭部目錄）
+
+## 2. SMP2P — Shared Memory Point to Point（信號層）
+
+像「跨核的 GPIO」：一個 host 翻轉某個 bit → 對方收到中斷。用於通知「FIFO 有資料了」「子系統重啟了」等事件，**不搬資料**。
+
+- 每條 edge 是一對 in/out entry，存在 SMEM 裡（`SMEM_ID_SMP2P_0 = 616`）；magic `0x504D5324`（"$SMP"），最多 1024 entries。
+- 重啟握手：`SMP2P_FLAG_RESTART_DONE` / `_ACK`。
+- **API**（`api/mproc/smp2p.h`）：`smp2p_create()` 建一條具名 entry → `smp2p_write()` 翻 bit 觸發中斷。`SMP2P_FLAGS_NO_INTR` 可只寫不中斷。
+- **檔案**：`smp2p/src/smp2p.c`（核心）、`smp2p_events.c`（事件分派）、`smp2p_target.c`（中斷硬體繫結）。
+
+## 3. G-Link — Generic Link（邏輯通道層）
+
+上層真正使用的 API。在 SMEM transport 之上提供**多條命名雙向通道**，類似 socket。
+
+- **連線模型**：`glink_open({ remote_ss:"apss", name:"<channel>", notify_rx:cb })` → 跟遠端某核的某具名通道建立連線。`remote_ss` 用上表的 name（"apss"/"lpass"…）。
+- **核心機制**：
+  - **RX intent** — 接收端預先宣告「我準備好收 N bytes」的緩衝（零拷貝流控），送端才能送。
+  - **QoS** — `glink_qos.c` 優先權排程；transport 優先序 `GLINK_XPORT_SMEM=100`。
+  - **訊號線** — `glink_sigs_set/get`（類似 UART 的 RTS/CTS 帶內信號）。
+  - **intentless transport** — 小封包免 intent 的快速路徑。
+- **檔案分層**：
+  - `glink/core/src/glink_api.c` — 公開 API：`glink_open/close/tx/txv/queue_rx_intent/rx_done`
+  - `glink/core/src/glink_core_*.c` — 狀態機、intent 管理、full/intentless transport
+  - `glink/xport_smem/src/xport_smem.c` — **把 G-Link 接到 SMEM**：FIFO 環形緩衝讀寫
+  - `glink/xport_smem/src/xport_smem_devcfg.c` — 從 devicetree 讀每條 edge（remote_host、fifo_size、irq）
+  - `glink/ssr/src/glink_ssr.c` — **SSR（Subsystem Restart）**：某核 crash 重啟時，通知並重建所有通道
+  - `glink/glink_loopback/` — 自我回環測試（per-variant：aspen_lpai_awm / aspen_lpai_swm）
+
+## 各層 API 對應
+
+| 層 | 公開 header | 核心入口 |
+|----|------------|----------|
+| G-Link | `api/mproc/glink.h` | `glink_open` / `glink_tx` |
+| SMP2P | `api/mproc/smp2p.h` | `smp2p_create` / `smp2p_write` |
+| SMEM | `api/mproc/smem.h` | `smem_alloc` |
+
+## 與 Android 端的對應
+
+Android（apss）端的對等實作就在你 build 的 vendor tree 裡 — kernel 的 `drivers/soc/qcom/` 下有 `smem.c`、`glink_*`、`smp2p`。兩端透過**同一塊 SMEM + 同一組硬體中斷線**對接：wm_proc 是 `SMEM_WM/SMEM_AM` host，Android 是 `SMEM_APPS` host，channel name 兩邊必須一致才能 `glink_open` 成功。
+
+## 與既有知識的關聯
+
+- 補上 SW6100 平台**第三塊拼圖**：QSSI（系統映像）、Vendor（vendor build）、**wm_proc（co-processor 韌體）**。
+- `sensinghub/sensors/drivers/bmm350` 與本 repo 的 `bmm360/`（Android SEE sensor driver）是**同系列磁力計的不同 SEE 環境版本**：bmm360 跑在 Android SLPI，bmm350 跑在 Zephyr wm_proc。
 </script>
 
 <!-- ── Dependencies ── -->
